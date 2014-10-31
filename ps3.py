@@ -109,16 +109,7 @@ def encode_labels(y):
     # print le.inverse_transform([1, 0, 1, 0, 1, 0, 1, 0])
     return y, le
 
-def main(args):
-    # Our features and two sets of labels
-    corpus, y_qa, y_em = read_dir_sk(args.data)
-
-    y_qa, le_qa = encode_labels(y_qa)
-    y_em, le_em = encode_labels(y_em)
-    X = vectorize_data(corpus)
-    est = MultinomialNB()
-    est.fit(X, y_qa)
-
+def run_pipeline(data, targets):
     pipe = Pipeline([
         ('vect', CountVectorizer()),
         ('tfidf', TfidfTransformer()),
@@ -128,24 +119,23 @@ def main(args):
     params = {
     # uncommenting more parameters will give better exploring power but will
     # increase processing time in a combinatorial way
-        #'vect__max_df': (0.5, 0.75, 1.0),
-    #    'vect__max_features': (None, 5000, 10000, 50000),
+        'vect__max_df': (0.5, 0.75, 1.0),
+        'vect__max_features': (None, 5000, 10000, 50000),
         #'vect__max_n': (1, 2),  # words or bigrams
-    #    'tfidf__use_idf': (True, False),
-    #    'tfidf__norm': ('l1', 'l2'),
+        'tfidf__use_idf': (True, False),
+        'tfidf__norm': ('l1', 'l2'),
         'clf__alpha': (0.00001, 0.000001),
-    #    'clf__n_iter': (10, 50, 80),
+        #'clf__n_iter': (10, 50, 80),
     }
 
-    grid_search = GridSearchCV(pipe, params, verbose=1)
+    grid_search= GridSearchCV(pipe, params, cv=11, verbose=1)
 
     print("Performing grid search...")
     print("pipe:", [name for name, _ in pipe.steps])
     print("params:")
     pprint(params)
     t0 = time()
-    #grid_search.fit(corpus, y_qa)
-    grid_search.fit(corpus, y_em)
+    grid_search.fit(data, targets)
     print("done in %0.3fs" % (time() - t0))
     print()
 
@@ -154,6 +144,25 @@ def main(args):
     best_params = grid_search.best_estimator_.get_params()
     for param_name in sorted(params.keys()):
         print("\t%s: %r" % (param_name, best_params[param_name]))
+
+
+def main(args):
+    # Our features and two sets of labels
+    corpus, y_qa, y_em = read_dir_sk(args.data)
+
+    y_qa, le_qa = encode_labels(y_qa)
+    y_em, le_em = encode_labels(y_em)
+    #X = vectorize_data(corpus)
+    #est = MultinomialNB()
+    #est.fit(X, y_qa)
+
+    print
+    print("--- Q/A ---")
+    run_pipeline(corpus, y_qa)
+
+    print
+    print("--- E/M ---")
+    run_pipeline(corpus, y_em)
 
     #pp.pprint(corpus)
     #pp.pprint(le_qa.inverse_transform(y_qa))
