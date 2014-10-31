@@ -8,15 +8,20 @@ import csv
 import argparse
 from pprint import pprint
 from time import time
-import logging
 
+import logging
+from operator import itemgetter
 import numpy as np
+
 from sklearn.preprocessing import LabelEncoder
 from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.feature_extraction.text import TfidfTransformer
+
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.grid_search import GridSearchCV
 from sklearn.pipeline import Pipeline
-from sklearn.feature_extraction.text import TfidfTransformer
+from sklearn.cross_validation import KFold
 
 def read_csv(path):
     output = []
@@ -105,21 +110,28 @@ def encode_labels(y):
     return y, le
 
 def run_pipeline(data, targets):
+    #pipe = Pipeline([
+        #("vect", CountVectorizer()),
+        #("tfidf", TfidfTransformer()),
+        #("clf", MultinomialNB())
+    #])
+
     pipe = Pipeline([
-        ('vect', CountVectorizer()),
-        ('tfidf', TfidfTransformer()),
-        ('clf', MultinomialNB())
+        ("vect", TfidfVectorizer(stop_words="english")),
+        ("clf", MultinomialNB())
     ])
 
     params = {
-        'vect__max_df': (0.5, 0.75, 1.0),
-        'vect__max_features': (None, 5000, 10000, 50000),
-        'tfidf__use_idf': (True, False),
-        'tfidf__norm': ('l1', 'l2'),
-        'clf__alpha': (0.00001, 0.000001),
+        #"vect__max_df": (0.5, 0.75, 1.0),
+        #"vect__max_features": (None, 5000, 10000, 50000),
+        "vect__use_idf": (True, False),
+        #"vect__analyzer": ("word", "char"),
+        "vect__ngram_range": ((1,2), (1,3), (1,1)),
+        "vect__norm": ("l1", "l2"),
+        "clf__alpha": (0.001, 0.00001, 0.000001)
     }
 
-    grid_search= GridSearchCV(pipe, params, cv=11, verbose=1)
+    grid_search= GridSearchCV(pipe, params, cv=KFold(len(targets), 11), verbose=1)
 
     print("Performing grid search...")
     print("pipe:", [name for name, _ in pipe.steps])
@@ -128,7 +140,7 @@ def run_pipeline(data, targets):
     t0 = time()
     grid_search.fit(data, targets)
     print("done in %0.3fs" % (time() - t0))
-    print()
+    print
 
     print("Best score: %0.3f" % grid_search.best_score_)
     print("Best params set:")
@@ -136,6 +148,21 @@ def run_pipeline(data, targets):
     for param_name in sorted(params.keys()):
         print("\t%s: %r" % (param_name, best_params[param_name]))
 
+    report(grid_search.grid_scores_)
+    return grid_search.best_estimator_
+
+def report(grid_scores, n_top=10):
+    """
+    Helper function to report score performance
+    """
+    top_scores = sorted(grid_scores, key=itemgetter(1), reverse=True)[:n_top]
+    for i, score in enumerate(top_scores):
+        print("{2}. Mean validation score: {0:.3f} (std: {1:.3f})".format(
+              score.mean_validation_score,
+              np.std(score.cv_validation_scores),
+              i + 1 ))
+        print("Parameters: {0}".format(score.parameters))
+        print("")
 
 def main(args):
     # Our features and two sets of labels
@@ -143,17 +170,20 @@ def main(args):
 
     y_qa, le_qa = encode_labels(y_qa)
     y_em, le_em = encode_labels(y_em)
-    #X = vectorize_data(corpus)
-    #est = MultinomialNB()
-    #est.fit(X, y_qa)
 
-    print
     print("--- Q/A ---")
-    run_pipeline(corpus, y_qa)
+    best_qa_clf = run_pipeline(corpus, y_qa)
+    # leave out the first dataset to simulate test data performance
+    #best_qa_clf = run_pipeline(corpus[40:], y_qa[40:])
+    #print("Performance on the left out dataset: {0}".format(
+        #best_qa_clf.score(corpus[:40], y_qa[:40])))
 
     print
     print("--- E/M ---")
-    run_pipeline(corpus, y_em)
+    best_em_clf = run_pipeline(corpus, y_em)
+    #best_em_clf = run_pipeline(corpus[40:], y_em[40:])
+    #print("Performance on the left out dataset: {0}".format(
+        #best_em_clf.score(corpus[:40], y_em[:40])))
 
     #pp.pprint(corpus)
     #pp.pprint(le_qa.inverse_transform(y_qa))
