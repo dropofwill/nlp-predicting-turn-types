@@ -49,11 +49,6 @@ def read_dir_sk(path):
                     X.append(row[5])
     return X, y_qa, y_em
 
-def vectorize_data(corpus):
-    vectorizer = CountVectorizer(min_df = 1)
-    X = vectorizer.fit_transform(corpus)
-    return X
-
 def read_dir_dict(path):
     """
     Takes a path to a directory of csv data files, parses them individually,
@@ -117,15 +112,11 @@ def run_pipeline(data, targets):
     ])
 
     params = {
-    # uncommenting more parameters will give better exploring power but will
-    # increase processing time in a combinatorial way
         'vect__max_df': (0.5, 0.75, 1.0),
         'vect__max_features': (None, 5000, 10000, 50000),
-        #'vect__max_n': (1, 2),  # words or bigrams
         'tfidf__use_idf': (True, False),
         'tfidf__norm': ('l1', 'l2'),
         'clf__alpha': (0.00001, 0.000001),
-        #'clf__n_iter': (10, 50, 80),
     }
 
     grid_search= GridSearchCV(pipe, params, cv=11, verbose=1)
