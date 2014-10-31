@@ -1,20 +1,26 @@
 NLP Problem Set 3
 ===============
 
-### Feature ideas:
+## TODO
+
+More feature extraction (see feature ideas)
+
+Experiment with combinging features
+
+## Feature ideas:
 
 Question words as features: how, what, where, when, who, etc.?
 
-Features that won't be image content specific:
+*Features that won't be image content specific:*
 
-  Semantic parsing
+Semantic parsing
 
-  Name Entity Recognition
+Name Entity Recognition
 
-  Syntactic features
+Syntactic features
 
 
-### Reporting Deliverables
+## Reporting Deliverables
 
 1. Title (including name/acronym of your team’s system implementation and the names of contributing team members on the first slide)
 
