@@ -18,7 +18,7 @@ Features that won't be image content specific:
 
 1. Title (including name/acronym of your team’s system implementation and the names of contributing team members on the first slide)
 
-<System Name/Acronym?>
+**System Name/Acronym?**
 
 Ryan Dennehy, Tong Liu, & Will Paul
 
