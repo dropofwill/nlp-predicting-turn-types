@@ -3,9 +3,19 @@ NLP Problem Set 3
 
 ## TODO
 
-More feature extraction (see feature ideas)
+More feature extraction techniques (see feature ideas)
 
-Experiment with combinging features
+Preprocessing the text data: remove \*, repair turns <>, cleanup brackets \[\]
+
+Combining feature different feature selection techniques with a feature union, possibly in the pipeline, [like here](http://zacstewart.com/2014/08/05/pipelines-of-featureunions-of-pipelines.html)?
+
+Try feature selection to see how something like SelectKBest or the like would effect results (add it to the GridSearch?)
+
+Try lots of different ML algorithms and their various tuning parameters available in Sklearn.
+
+Split data further leaving one out to simulate the test environment.
+
+Produce the necessary performance measures for reporting purposes.
 
 ## Feature ideas:
 
