@@ -3,6 +3,7 @@ Team Challenge: Predicting Turn Types
 Authors: Tong, Will, and Ryan
 """
 import os
+import re
 import sys
 import csv
 import argparse
@@ -48,10 +49,11 @@ def read_dir_sk(path):
                 for row in csv:
                     y_qa.append(row[3])
                     y_em.append(row[4])
-                    # TODO: need to do some preprocessing here
+                    # remove asterisk *
                     # remove entire repair turns <>
                     # remove brackets around words []
-                    X.append(row[5])
+                    text = re.sub(r'(<|>|\[|\]|\*)', '', row[5])
+                    X.append(text)
     return X, y_qa, y_em
 
 def read_dir_dict(path):
