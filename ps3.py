@@ -212,7 +212,8 @@ def main(args):
 
         # how many documents are in the training set?
         len_img_train = int(float(len(train_y_qa))/40.0)
-        print(len_img_train)
+        len_img_test = int(float(len(test_y_qa))/40.0)
+        print(len_img_train, len_img_test)
 
         print("--- Q/A ---")
         qa_grid_search, qa_pipe, qa_params = tfidf_mnb_pipeline(train_X,
