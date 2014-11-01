@@ -59,4 +59,3 @@ Ryan Dennehy, Tong Liu, & Will Paul
 8. Conclusion
 
 9. References, as applicable
->>>>>>> master
