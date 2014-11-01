@@ -157,37 +157,22 @@ def report(grid_scores, n_top=10):
         print("Parameters: {0}".format(score.parameters))
         print("")
 
-def find_baseline(y_qa, y_em):
-    q_count = 0
-    a_count = 0
-    e_count = 0
-    m_count = 0
+def find_baseline(y_label):
+    count_1 = 0
+    count_2 = 0
 
-    for item in y_qa:
-        if item == 'Q':
-            q_count += 1
+    for item in y_label:
+        if item == 'Q' or item == 'E':
+            count_1 += 1
         else:
-            a_count += 1
+            count_2 += 1
 
-    for item in y_em:
-        if item == 'E':
-            e_count += 1
-        else:
-            m_count += 1
-
-    if q_count >= a_count:
-        baseline_prob1 = q_count / len(y_qa)
+    if count_1 >= count_2:
+        baseline_prob = count_1 / len(y_label)
     else:
-        baseline_prob1 = a_count / len(y_qa)
+        baseline_prob = count_2 / len(y_label)
 
-    if e_count >= m_count:
-        baseline_prob2 = e_count / len(y_em)
-    else:
-        baseline_prob2 = m_count / len(y_em)
-
-    return baseline_prob1, baseline_prob2
-
-
+    return baseline_prob
 
 def get_metrics(baseline_prob, y_testfile, y_predfile):
     # test dataset
