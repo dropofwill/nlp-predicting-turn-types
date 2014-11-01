@@ -32,6 +32,13 @@ def read_csv(path):
             output.append(row)
     return output
 
+def write_csv(path, subjectID, imageID, questionID, QA, EM, text):
+    with open(path, "wb") as f:
+        writer = csv.writer(f,delimiter=",",dialect="excel")
+        for i in range(len(subjectID)):
+            writer.writerow([subjectID[i], imageID[i], questionID[i], QA[i], EM[i], text[i]])
+    return text
+
 def read_dir_sk(path):
     """
     Takes a path to a directory of csv data files, parses them individually,
@@ -40,11 +47,16 @@ def read_dir_sk(path):
     X = []
     y_qa = []
     y_em = []
+    sID = []
+    iID = []
+    qID = []
+    fID = []
     for root, subdirs, files in os.walk(path):
         for f in files:
             if f.endswith(".csv"):
                 a_file_path = os.path.join(root, f)
                 csv = read_csv(a_file_path)
+                fID.append(f)
 
                 for row in csv:
                     y_qa.append(row[3])
@@ -54,7 +66,10 @@ def read_dir_sk(path):
                     # remove brackets around words []
                     text = re.sub(r'(<|>|\[|\]|\*)', '', row[5])
                     X.append(text)
-    return X, y_qa, y_em
+                    sID.append(row[0])
+                    iID.append(row[1])
+                    qID.append(row[2])
+    return sID, iID, qID, X, y_qa, y_em, fID
 
 def read_dir_dict(path):
     """
@@ -148,7 +163,7 @@ def tfidf_mnb_pipeline(data, targets, num_images=11):
         #"vect__max_df": (0.5, 0.75, 1.0),
         #"vect__max_features": (None, 5000, 10000, 50000),
         "vect__use_idf": (True, False),
-        #"vect__analyzer": ("word", "char"),
+        "vect__analyzer": ("word", "char"),
         "vect__ngram_range": ((1,2), (1,3), (1,1)),
         "vect__norm": ("l1", "l2"),
         "clf__alpha": (0.001, 0.00001, 0.000001)
@@ -249,7 +264,6 @@ def get_metrics(baseline_prob, y_test_list, y_pred_list, plot_results=True):
         plt.legend(loc="lower right")
         plt.show()
 
-
 def main(args):
     if (args.data):
         # Our features and two sets of labels
@@ -270,8 +284,15 @@ def main(args):
         best_em_clf = em_grid_search.best_estimator_
 
     elif (args.test and args.train):
-        train_X, train_y_qa, train_y_em = read_dir_sk(args.train)
-        test_X, test_y_qa, test_y_em = read_dir_sk(args.test)
+        s1, i1, q1, train_X, train_y_qa, train_y_em, _ = read_dir_sk(args.train)
+        s2, i2, q2, test_X, test_y_qa, test_y_em, test_f_names = read_dir_sk(args.test)
+
+        print(test_f_names)
+
+        train_y_qa, le_qa = encode_labels(train_y_qa)
+        train_y_em, le_em = encode_labels(train_y_em)
+        test_y_qa, le_qa = encode_labels(test_y_qa)
+        test_y_em, le_em = encode_labels(test_y_em)
 
         train_y_qa, le_qa = encode_labels(train_y_qa)
         train_y_em, le_em = encode_labels(train_y_em)
@@ -305,7 +326,6 @@ def main(args):
         print("Metrics for Q/A task on Image 2")
         get_metrics(qa_baseline_prob, test_y_qa[40:], qa_predictions[40:], False)
 
-        print
         print("--- E/M ---")
         em_grid_search, em_pipe, em_params = tfidf_mnb_pipeline(train_X,
                                                                 train_y_em,
@@ -322,6 +342,19 @@ def main(args):
         get_metrics(em_baseline_prob, test_y_em[:40], em_predictions[:40], False)
         print("Metrics for E/M task on Image 2")
         get_metrics(em_baseline_prob, test_y_em[40:], em_predictions[40:], False)
+
+        s_i = 0
+        for i, f in enumerate(test_f_names):
+            e_i = (i+1) * 40
+            write_csv(f, s2[s_i:e_i],
+                         i2[s_i:e_i],
+                         q2[s_i:e_i],
+                         qa_predictions[s_i:e_i],
+                         em_predictions[s_i:e_i],
+                         test_X[s_i:e_i])
+            print("length check")
+            print(s_i, e_i)
+            s_i = e_i
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
