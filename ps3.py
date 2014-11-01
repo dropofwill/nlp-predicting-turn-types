@@ -183,24 +183,18 @@ def report_grid_scores(grid_scores, n_top=10):
         print("Parameters: {0}".format(score.parameters))
         print("")
 
-def get_metrics(y_testfile, y_predfile):
-    # test dataset
-    y_testfile =
+def get_metrics(y_test_list, y_pred_list):
+    y_true, _ = encode_labels(y_test_list)
+    print(y_true)
 
-    y_true = []
-    for val in y_testfile:
-        y_true.append(val)
-
-    # prediction result
-    y_predfile =
-
-    y_pred = []
-    for val in y_predfile:
-        val = float(val)
-        if val > 0.0:
-            y_pred.append(1)
-        else:
-            y_pred.append(-1)
+    y_pred, _ = encode_labels(y_pred_list)
+    print(y_pred)
+    #for val in y_predfile:
+        #val = float(val)
+        #if val > 0.0:
+            #y_pred.append(1)
+        #else:
+            #y_pred.append(-1)
 
     # report the confusion matrix
     cm = confusion_matrix(y_true, y_pred)
@@ -274,6 +268,8 @@ def main(args):
         qa_predictions = best_qa_clf.predict(test_X)
         print(qa_predictions)
 
+        get_metrics(test_y_qa, qa_predictions)
+
         print
         print("--- E/M ---")
         em_grid_search, em_pipe, em_params = tfidf_mnb_pipeline(train_X,
@@ -287,7 +283,8 @@ def main(args):
         em_predictions = best_em_clf.predict(test_X)
         print(em_predictions)
 
-    get_metrics(y_testfile, y_predfile)
+        get_metrics(test_y_em, em_predictions)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
