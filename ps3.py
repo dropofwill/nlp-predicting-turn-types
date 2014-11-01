@@ -184,17 +184,11 @@ def report_grid_scores(grid_scores, n_top=10):
         print("")
 
 def get_metrics(y_test_list, y_pred_list):
-    y_true, _ = encode_labels(y_test_list)
+    y_true = y_test_list
     print(y_true)
 
-    y_pred, _ = encode_labels(y_pred_list)
+    y_pred = y_pred_list
     print(y_pred)
-    #for val in y_predfile:
-        #val = float(val)
-        #if val > 0.0:
-            #y_pred.append(1)
-        #else:
-            #y_pred.append(-1)
 
     # report the confusion matrix
     cm = confusion_matrix(y_true, y_pred)
@@ -251,6 +245,11 @@ def main(args):
     elif (args.test and args.train):
         train_X, train_y_qa, train_y_em = read_dir_sk(args.train)
         test_X, test_y_qa, test_y_em = read_dir_sk(args.test)
+
+        train_y_qa, le_qa = encode_labels(train_y_qa)
+        train_y_em, le_em = encode_labels(train_y_em)
+        test_y_qa, le_qa = encode_labels(test_y_qa)
+        test_y_em, le_em = encode_labels(test_y_em)
 
         # how many documents are in the training set?
         len_img_train = int(float(len(train_y_qa))/40.0)
