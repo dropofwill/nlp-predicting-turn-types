@@ -18,7 +18,7 @@ from sklearn.naive_bayes import MultinomialNB
 from sklearn.grid_search import GridSearchCV
 from sklearn.pipeline import Pipeline
 from sklearn.cross_validation import KFold
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 from sklearn import metrics
 
 def read_csv(path):
@@ -157,24 +157,50 @@ def report(grid_scores, n_top=10):
         print("Parameters: {0}".format(score.parameters))
         print("")
 
-def get_metrics(y_testfile, y_predfile):
-    # test dataset
-    y_testfile =
+def find_baseline(y_qa, y_em):
+    q_count = 0
+    a_count = 0
+    e_count = 0
+    m_count = 0
 
+    for item in y_qa:
+        if item == 'Q':
+            q_count += 1
+        else:
+            a_count += 1
+
+    for item in y_em:
+        if item == 'E':
+            e_count += 1
+        else:
+            m_count += 1
+
+    if q_count >= a_count:
+        baseline_prob1 = q_count / len(y_qa)
+    else:
+        baseline_prob1 = a_count / len(y_qa)
+
+    if e_count >= m_count:
+        baseline_prob2 = e_count / len(y_em)
+    else:
+        baseline_prob2 = m_count / len(y_em)
+
+    return baseline_prob1, baseline_prob2
+
+
+
+def get_metrics(baseline_prob, y_testfile, y_predfile):
+    # test dataset
     y_true = []
-    for val in y_testfile:
-        y_true.append(val)
 
     # prediction result
-    y_predfile =
-
     y_pred = []
-    for val in y_predfile:
-        val = float(val)
-        if val > 0.0:
-            y_pred.append(1)
-        else:
-            y_pred.append(-1)
+
+    accuracy = accuracy_score(y_true, y_pred)
+    print 'Accuracy on test data: ' + str(accuracy)
+
+    reduction = accuracy - baseline_prob
+    print 'Error reduction over the majority class baseline: ' + str(reduction)
 
     # report the confusion matrix
     cm = confusion_matrix(y_true, y_pred)
@@ -197,7 +223,7 @@ def get_metrics(y_testfile, y_predfile):
     print("Area under the ROC curve: %f" % roc_auc)
 
     # plot ROC curve
-    plt.clf()
+    plt.figure()
     plt.plot(fpr, tpr, label='ROC curve (area = %0.2f)' % roc_auc)
     plt.plot([0, 1], [0, 1], 'k--')
     plt.xlim([0.0, 1.0])
@@ -229,8 +255,6 @@ def main(args):
     #best_em_clf = run_pipeline(corpus[40:], y_em[40:])
     #print("Performance on the left out dataset: {0}".format(
         #best_em_clf.score(corpus[:40], y_em[:40])))
-
-    get_metrics(y_testfile, y_predfile)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
