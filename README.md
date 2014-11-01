@@ -15,6 +15,8 @@ Split data further leaving one out to simulate the test environment.
 
 Produce the necessary performance measures for reporting purposes.
 
+Output CSV with our predictions in the same format as the input.
+
 ## Feature ideas:
 
 Question words as features: how, what, where, when, who, etc.?
@@ -57,4 +59,3 @@ Ryan Dennehy, Tong Liu, & Will Paul
 8. Conclusion
 
 9. References, as applicable
->>>>>>> master
