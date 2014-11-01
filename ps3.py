@@ -2,6 +2,7 @@
 Team Challenge: Predicting Turn Types
 Authors: Tong, Will, and Ryan
 """
+
 import os
 import re
 import sys
@@ -181,19 +182,12 @@ def main(args):
     #print("Performance on the left out dataset: {0}".format(
         #best_em_clf.score(corpus[:40], y_em[:40])))
 
-    #pp.pprint(corpus)
-    #pp.pprint(le_qa.inverse_transform(y_qa))
-    #pp.pprint(X)
-    #pp.pprint(y_qa)
-    #pp.pprint(y_em)
-
-    #data_2 = read_dir_dict(args.data)
-    #q_features(data_2)
-
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+
     # If no explicit training data, algorithm splits it itself
     parser.add_argument( "-d", "--data", help="pass a folder path to the data")
+
     # Otherwise
     parser.add_argument( "-t", "--train", help="pass a folder path to the training data")
     parser.add_argument( "-s", "--test", help="pass a folder path to the testing data")
