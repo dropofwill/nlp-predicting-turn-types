@@ -223,6 +223,8 @@ def main(args):
 
         print("Q/A performance on the left out dataset: {0}".format(
             best_qa_clf.score(test_X, test_y_qa)))
+        qa_predictions = best_qa_clf.predict(test_X)
+        print(qa_predictions)
 
         print
         print("--- E/M ---")
@@ -234,6 +236,8 @@ def main(args):
 
         print("E/M performance on the left out dataset: {0}".format(
             best_em_clf.score(test_X, test_y_em)))
+        em_predictions = best_em_clf.predict(test_X)
+        print(em_predictions)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
