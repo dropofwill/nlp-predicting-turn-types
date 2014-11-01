@@ -3,27 +3,23 @@ Team Challenge: Predicting Turn Types
 Authors: Tong, Will, and Ryan
 """
 
-import os
-import re
-import sys
-import csv
-import argparse
+import os, re, sys, csv, argparse, logging
 from pprint import pprint
 from time import time
 
-import logging
 from operator import itemgetter
 import numpy as np
+import matplotlib.pyplot as plt
 
 from sklearn.preprocessing import LabelEncoder
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.feature_extraction.text import TfidfTransformer
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer, TfidfTransformer
 
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.grid_search import GridSearchCV
 from sklearn.pipeline import Pipeline
 from sklearn.cross_validation import KFold
+from sklearn.metrics import classification_report, confusion_matrix
+from sklearn import metrics
 
 def read_csv(path):
     output = []
@@ -193,6 +189,46 @@ def report_test_accuracy():
 def report_error_reduction_accuracy():
     pass
 
+def get_metrics(y_test_list, y_pred_list):
+    y_true = y_test_list
+    print(y_true)
+
+    y_pred = y_pred_list
+    print(y_pred)
+
+    # report the confusion matrix
+    cm = confusion_matrix(y_true, y_pred)
+    print 'Confusion Matrix:\n' + str(cm)
+
+    # plot confusion matrix in color in a separate window
+    plt.matshow(cm)
+    plt.title('Confusion matrix')
+    plt.colorbar()
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label')
+    plt.show()
+
+    # report the classification metrics
+    print( classification_report(y_true, y_pred) )
+
+    # compute ROC curve and area the curve
+    fpr, tpr, thresholds = metrics.roc_curve(y_true, y_pred)
+    roc_auc = metrics.auc(fpr, tpr)
+    print("Area under the ROC curve: %f" % roc_auc)
+
+    # plot ROC curve
+    plt.clf()
+    plt.plot(fpr, tpr, label='ROC curve (area = %0.2f)' % roc_auc)
+    plt.plot([0, 1], [0, 1], 'k--')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.0])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Receiver Operating Characteristic')
+    plt.legend(loc="lower right")
+    plt.show()
+
+
 def main(args):
     if (args.data):
         # Our features and two sets of labels
@@ -216,6 +252,11 @@ def main(args):
         train_X, train_y_qa, train_y_em = read_dir_sk(args.train)
         test_X, test_y_qa, test_y_em = read_dir_sk(args.test)
 
+        train_y_qa, le_qa = encode_labels(train_y_qa)
+        train_y_em, le_em = encode_labels(train_y_em)
+        test_y_qa, le_qa = encode_labels(test_y_qa)
+        test_y_em, le_em = encode_labels(test_y_em)
+
         # how many documents are in the training set?
         len_img_train = int(float(len(train_y_qa))/40.0)
         len_img_test = int(float(len(test_y_qa))/40.0)
@@ -233,6 +274,8 @@ def main(args):
         qa_predictions = best_qa_clf.predict(test_X)
         print(qa_predictions)
 
+        get_metrics(test_y_qa, qa_predictions)
+
         print
         print("--- E/M ---")
         em_grid_search, em_pipe, em_params = tfidf_mnb_pipeline(train_X,
@@ -245,6 +288,9 @@ def main(args):
             best_em_clf.score(test_X, test_y_em)))
         em_predictions = best_em_clf.predict(test_X)
         print(em_predictions)
+
+        get_metrics(test_y_em, em_predictions)
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
