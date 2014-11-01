@@ -112,7 +112,34 @@ def encode_labels(y):
     # print le.inverse_transform([1, 0, 1, 0, 1, 0, 1, 0])
     return y, le
 
-def run_pipeline(data, targets):
+def grid_search_pipeline(pipe, params, cv, data, targets):
+    """
+    For a given pipeline, parameters, cross validator, dataset, and target labels
+    Run a grid search using the given pipeline and cross validator over the set
+    of parameters, printing the progress as it goes.
+    Returns the results
+    """
+
+    grid_search = GridSearchCV(pipe, params, cv=cv, verbose=1)
+
+    print("Performing grid search...")
+    print("pipe:", [name for name, _ in pipe.steps])
+    print("params:")
+    pprint(params)
+    print
+    t0 = time()
+    grid_search.fit(data, targets)
+    print("done in %0.3fs" % (time() - t0))
+
+    return grid_search
+
+def tfidf_mnb_pipeline(data, targets, num_images=11):
+    """
+    A simple pipeline using tfidf vectorizer, multinomial naive bayes, and KFold
+    cross validation such that on each run one image file is left out (set
+    num_images differently if working on a smaller training set)
+    Returns the grid_search results, pipeline, and parameters used
+    """
     pipe = Pipeline([
         ("vect", TfidfVectorizer(stop_words="english")),
         ("clf", MultinomialNB())
@@ -128,29 +155,28 @@ def run_pipeline(data, targets):
         "clf__alpha": (0.001, 0.00001, 0.000001)
     }
 
-    grid_search= GridSearchCV(pipe, params, cv=KFold(len(targets), 11), verbose=1)
+    cv = KFold(len(targets), num_images)
 
-    print("Performing grid search...")
-    print("pipe:", [name for name, _ in pipe.steps])
-    print("params:")
-    pprint(params)
-    t0 = time()
-    grid_search.fit(data, targets)
-    print("done in %0.3fs" % (time() - t0))
-    print
+    grid_search = grid_search_pipeline(pipe, params, cv, data, targets)
 
+    #return grid_search.best_estimator_
+    return grid_search, pipe, params
+
+def report_grid_search(grid_search, pipe, params):
+    """
+    Report the results of a given grid search
+    """
     print("Best score: %0.3f" % grid_search.best_score_)
     print("Best params set:")
     best_params = grid_search.best_estimator_.get_params()
     for param_name in sorted(params.keys()):
         print("\t%s: %r" % (param_name, best_params[param_name]))
 
-    report(grid_search.grid_scores_)
-    return grid_search.best_estimator_
+    report_grid_scores(grid_search.grid_scores_)
 
-def report(grid_scores, n_top=10):
+def report_grid_scores(grid_scores, n_top=10):
     """
-    Helper function to report score performance
+    Helper function to report score performance of the top n classifier / params
     """
     top_scores = sorted(grid_scores, key=itemgetter(1), reverse=True)[:n_top]
     for i, score in enumerate(top_scores):
@@ -162,25 +188,52 @@ def report(grid_scores, n_top=10):
         print("")
 
 def main(args):
-    # Our features and two sets of labels
-    corpus, y_qa, y_em = read_dir_sk(args.data)
+    if (args.data):
+        # Our features and two sets of labels
+        X, y_qa, y_em = read_dir_sk(args.data)
 
-    y_qa, le_qa = encode_labels(y_qa)
-    y_em, le_em = encode_labels(y_em)
+        y_qa, le_qa = encode_labels(y_qa)
+        y_em, le_em = encode_labels(y_em)
 
-    print("--- Q/A ---")
-    best_qa_clf = run_pipeline(corpus, y_qa)
-    # leave out the first dataset to simulate test data performance
-    #best_qa_clf = run_pipeline(corpus[40:], y_qa[40:])
-    #print("Performance on the left out dataset: {0}".format(
-        #best_qa_clf.score(corpus[:40], y_qa[:40])))
+        print("--- Q/A ---")
+        qa_grid_search, qa_pipe, qa_params = tfidf_mnb_pipeline(X, y_qa)
+        report_grid_search(qa_grid_search, qa_pipe, qa_params)
+        best_qa_clf = qa_grid_search.best_estimator_
 
-    print
-    print("--- E/M ---")
-    best_em_clf = run_pipeline(corpus, y_em)
-    #best_em_clf = run_pipeline(corpus[40:], y_em[40:])
-    #print("Performance on the left out dataset: {0}".format(
-        #best_em_clf.score(corpus[:40], y_em[:40])))
+        print
+        print("--- E/M ---")
+        em_grid_search, em_pipe, em_params = tfidf_mnb_pipeline(X, y_em)
+        report_grid_search(em_grid_search, em_pipe, em_params)
+        best_em_clf = em_grid_search.best_estimator_
+
+    elif (args.test and args.train):
+        train_X, train_y_qa, train_y_em = read_dir_sk(args.train)
+        test_X, test_y_qa, test_y_em = read_dir_sk(args.test)
+
+        # how many documents are in the training set?
+        len_img_train = int(float(len(train_y_qa))/40.0)
+        print(len_img_train)
+
+        print("--- Q/A ---")
+        qa_grid_search, qa_pipe, qa_params = tfidf_mnb_pipeline(train_X,
+                                                                train_y_qa,
+                                                                len_img_train)
+        report_grid_search(qa_grid_search, qa_pipe, qa_params)
+        best_qa_clf = qa_grid_search.best_estimator_
+
+        print("Q/A performance on the left out dataset: {0}".format(
+            best_qa_clf.score(test_X, test_y_qa)))
+
+        print
+        print("--- E/M ---")
+        em_grid_search, em_pipe, em_params = tfidf_mnb_pipeline(train_X,
+                                                                train_y_em,
+                                                                len_img_train)
+        report_grid_search(em_grid_search, em_pipe, em_params)
+        best_em_clf = em_grid_search.best_estimator_
+
+        print("E/M performance on the left out dataset: {0}".format(
+            best_em_clf.score(test_X, test_y_em)))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
