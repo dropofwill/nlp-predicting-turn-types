@@ -2,3 +2,5 @@ PS3_dev/
 PS3_train/
 PS3_test/
 out.csv
+
+*.csv
