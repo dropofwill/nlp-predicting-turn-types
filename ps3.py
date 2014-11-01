@@ -110,12 +110,6 @@ def encode_labels(y):
     return y, le
 
 def run_pipeline(data, targets):
-    #pipe = Pipeline([
-        #("vect", CountVectorizer()),
-        #("tfidf", TfidfTransformer()),
-        #("clf", MultinomialNB())
-    #])
-
     pipe = Pipeline([
         ("vect", TfidfVectorizer(stop_words="english")),
         ("clf", MultinomialNB())
@@ -196,6 +190,11 @@ def main(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
+    # If no explicit training data, algorithm splits it itself
     parser.add_argument( "-d", "--data", help="pass a folder path to the data")
+    # Otherwise
+    parser.add_argument( "-t", "--train", help="pass a folder path to the training data")
+    parser.add_argument( "-s", "--test", help="pass a folder path to the testing data")
+
     args = parser.parse_args()
     main(args)
