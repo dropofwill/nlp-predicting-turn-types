@@ -21,6 +21,9 @@ from sklearn.cross_validation import KFold
 from sklearn.metrics import classification_report, confusion_matrix
 from sklearn import metrics
 
+# Hardcode global length of an image document
+len_img = 40
+
 def read_csv(path):
     output = []
     with open(path, 'rb') as f:
@@ -183,13 +186,7 @@ def report_grid_scores(grid_scores, n_top=10):
         print("Parameters: {0}".format(score.parameters))
         print
 
-def report_test_accuracy():
-    pass
-
-def report_error_reduction_accuracy():
-    pass
-
-def get_metrics(y_test_list, y_pred_list):
+def get_metrics(y_test_list, y_pred_list, plot_results=True):
     y_true = y_test_list
     print(y_true)
 
@@ -201,12 +198,13 @@ def get_metrics(y_test_list, y_pred_list):
     print 'Confusion Matrix:\n' + str(cm)
 
     # plot confusion matrix in color in a separate window
-    plt.matshow(cm)
-    plt.title('Confusion matrix')
-    plt.colorbar()
-    plt.ylabel('True label')
-    plt.xlabel('Predicted label')
-    plt.show()
+    if (plot_results):
+        plt.matshow(cm)
+        plt.title('Confusion matrix')
+        plt.colorbar()
+        plt.ylabel('True label')
+        plt.xlabel('Predicted label')
+        plt.show()
 
     # report the classification metrics
     print( classification_report(y_true, y_pred) )
@@ -217,16 +215,17 @@ def get_metrics(y_test_list, y_pred_list):
     print("Area under the ROC curve: %f" % roc_auc)
 
     # plot ROC curve
-    plt.clf()
-    plt.plot(fpr, tpr, label='ROC curve (area = %0.2f)' % roc_auc)
-    plt.plot([0, 1], [0, 1], 'k--')
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.0])
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.title('Receiver Operating Characteristic')
-    plt.legend(loc="lower right")
-    plt.show()
+    if (plot_results):
+        plt.clf()
+        plt.plot(fpr, tpr, label='ROC curve (area = %0.2f)' % roc_auc)
+        plt.plot([0, 1], [0, 1], 'k--')
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.0])
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title('Receiver Operating Characteristic')
+        plt.legend(loc="lower right")
+        plt.show()
 
 
 def main(args):
@@ -258,8 +257,8 @@ def main(args):
         test_y_em, le_em = encode_labels(test_y_em)
 
         # how many documents are in the training set?
-        len_img_train = int(float(len(train_y_qa))/40.0)
-        len_img_test = int(float(len(test_y_qa))/40.0)
+        len_img_train = int(float(len(train_y_qa))/float(len_img))
+        len_img_test = int(float(len(test_y_qa))/float(len_img))
         print(len_img_train, len_img_test)
 
         print("--- Q/A ---")
@@ -272,9 +271,12 @@ def main(args):
         print("Q/A performance on the left out dataset: {0}".format(
             best_qa_clf.score(test_X, test_y_qa)))
         qa_predictions = best_qa_clf.predict(test_X)
-        print(qa_predictions)
+        #print(qa_predictions)
 
-        get_metrics(test_y_qa, qa_predictions)
+        print("Metrics for Q/A task on Image 1")
+        get_metrics(test_y_qa[:40], qa_predictions[:40], False)
+        print("Metrics for Q/A task on Image 2")
+        get_metrics(test_y_qa[40:], qa_predictions[40:], False)
 
         print
         print("--- E/M ---")
@@ -287,9 +289,12 @@ def main(args):
         print("E/M performance on the left out dataset: {0}".format(
             best_em_clf.score(test_X, test_y_em)))
         em_predictions = best_em_clf.predict(test_X)
-        print(em_predictions)
+        #print(em_predictions)
 
-        get_metrics(test_y_em, em_predictions)
+        print("Metrics for E/M task on Image 1")
+        get_metrics(test_y_em[:40], em_predictions[:40], False)
+        print("Metrics for E/M task on Image 2")
+        get_metrics(test_y_em[40:], em_predictions[40:], False)
 
 
 if __name__ == "__main__":
