@@ -166,11 +166,11 @@ def tfidf_mnb_pipeline(data, targets, num_images=11):
     params = {
         #"vect__max_df": (0.5, 0.75, 1.0),
         #"vect__max_features": (None, 5000, 10000, 50000),
-        #"vect__use_idf": (True, False),
-        #"vect__analyzer": ("word", "char"),
-        #"vect__ngram_range": ((1,2), (1,3), (1,1)),
+        "vect__use_idf": (True, False),
+        "vect__analyzer": ("word", "char"),
+        "vect__ngram_range": ((1,2), (1,3), (1,1)),
         "vect__norm": ("l1", "l2"),
-        #"clf__alpha": (0.001, 0.00001, 0.000001)
+        "clf__alpha": (0.001, 0.00001, 0.000001)
     }
 
     cv = KFold(len(targets), num_images)
