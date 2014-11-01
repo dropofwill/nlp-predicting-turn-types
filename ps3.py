@@ -71,28 +71,6 @@ def read_dir_sk(path):
                     qID.append(row[2])
     return sID, iID, qID, X, y_qa, y_em, fID
 
-def read_dir_dict(path):
-    """
-    Takes a path to a directory of csv data files, parses them individually,
-    Returns an array of dicts
-    """
-    output = []
-    for root, subdirs, files in os.walk(path):
-        for f in files:
-            if f.endswith(".csv"):
-                a_file_path = os.path.join(root, f)
-                csv = read_csv(a_file_path)
-
-                for row in csv:
-                    example = { "subjectID": row[0],
-                                "imageID": row[1],
-                                "questionID": row[2],
-                                "Q/A": row[3],
-                                "E/M": row[4],
-                                "text": row[5] }
-                    output.append(example)
-    return output
-
 def q_features(data):
     questionWords = ["who", "what", "where", "when", "why", "[why]", "how", "and"]
     ansWords = ["sp", "well", "uh", "hm", "it", "mm"]
