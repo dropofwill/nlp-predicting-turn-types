@@ -185,7 +185,13 @@ def report_grid_scores(grid_scores, n_top=10):
               np.std(score.cv_validation_scores),
               i + 1 ))
         print("Parameters: {0}".format(score.parameters))
-        print("")
+        print
+
+def report_test_accuracy():
+    pass
+
+def report_error_reduction_accuracy():
+    pass
 
 def main(args):
     if (args.data):
