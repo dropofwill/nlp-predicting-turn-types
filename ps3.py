@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 
 from sklearn.preprocessing import LabelEncoder
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer, TfidfTransformer
+from sklearn.feature_extraction import DictVectorizer
 
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.grid_search import GridSearchCV
@@ -93,14 +94,24 @@ def q_features(data):
     print("Ratio: ", (qCount + aCount)/totalCount)
 
 def POS_feature(X):
+
+    featureList = []
     for text in X:
-        token = nltk.word_tokenize(text)
+        token = text.split()
         pos_tag = nltk.pos_tag(token)
+        small_dict = {}
         for item in pos_tag:
             word = item[0]
             pos = item[1]
+            small_dict[word] = pos
 
+        featureList.append(small_dict)
+    print featureList
 
+    vec = DictVectorizer()
+    data_POS_arr = vec.fit_transform(featureList).toarray()
+
+    return data_POS_arr
 
 def encode_labels(y):
     """
