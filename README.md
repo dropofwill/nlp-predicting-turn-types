@@ -79,3 +79,5 @@ Ryan Dennehy, Tong Liu, & Will Paul
 When we used the default cross validation scheme, which randomly mixes the data across documents, performance approached a 100% on the Q/A task and 87% on the E/M task. However, when we implemented the leave one out cross-validation technique, out results came back to earth, with 73% on the Q/A task and 66% on the E/M task.
 
 This tells us that the bag of words features weren't generalizing well enough (as expected) across domains (the various images). So we had to find some less content specific features.
+
+At the end of the file 5 the subject begins their answer by repeating the question, so our algorithm mistakingly reports that as a question.

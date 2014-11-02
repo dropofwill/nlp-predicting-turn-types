@@ -21,6 +21,8 @@ from sklearn.cross_validation import KFold
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 from sklearn import metrics
 
+from nltk import word_tokenize
+
 # Hardcode global length of an image document
 len_img = 40
 
@@ -76,26 +78,97 @@ def read_dir_sk(path):
                     qID.append(row[2])
     return sID, iID, qID, X, y_qa, y_em, fID
 
-def q_features(data):
-    questionWords = ["who", "what", "where", "when", "why", "[why]", "how", "and"]
-    ansWords = ["sp", "well", "uh", "hm", "it", "mm"]
+def q_features(X, begin=0, end=2):
+    wh_words = [    # Wh-pronouns
+                    "what", "which", "who", "whom",
+                    # Wh-possesive
+                    "whose",
+                    # Wh-adverb
+                    "how", "when", "where", "why",
+                    # Wh-* with 's
+                    "what's", "who's"]
+    ans_words = [   # non-speech disfluencies
+                    "sp", "{sl}", "{ls}", "{cg}", "{ns}", "{br}",
+                    # speech disfluencies
+                    "uh", "um", "hm", "mm"
+                    # conjunctions and sentence starter words
+                    "well", "and", "but", "yet"]
+    aux_verbs = ["am", "is", "are", "was", "were",
+                "have", "had", "has",
+                "do", "does", "did"]
+    modal_verbs = ["can", "could",
+                  "may", "might", "must",
+                  "shall", "should",
+                  "will", "would"]
 
-    totalCount = 0
-    qCount = 0
-    aCount = 0
-    for d in data:
-        totalCount += 1
-        for q in questionWords:
-            if d["text"].startswith(q):
-                qCount += 1
-                break
-        for a in ansWords:
-            if d["text"].startswith(a):
-                aCount += 1
-                break
+    features = []
+    text = []
+    for sentence in X:
+        per_utterance = dict()
+        tokens = sentence.split()
+        text.append(tokens)
 
-    print("Total: ", totalCount, "Q: ", qCount, "A: ", aCount)
-    print("Ratio: ", (qCount + aCount)/totalCount)
+        for i in range(begin, end + 1):
+            if len(tokens) > i + 1:
+                for wh in wh_words:
+                    if tokens[i] == wh:
+                        per_utterance[wh+"_"+str(i)] = 1
+                for aux in aux_verbs:
+                    if tokens[i] == aux:
+                        # Only match if the first, non ans_word
+                        if i != begin:
+                            ok = True
+                            for j in range(begin, i):
+                                if tokens[j] not in ans_words:
+                                    ok = False
+                            if ok:
+                                per_utterance[aux+"_"+str(i)] = 1
+                        else:
+                            per_utterance[aux+"_"+str(i)] = 1
+                for modal in modal_verbs:
+                    if tokens[i] == modal:
+                        # Only match if the first, non ans_word
+                        if i != begin:
+                            ok = True
+                            for j in range(begin, i):
+                                if tokens[j] not in ans_words:
+                                    ok = False
+                            if ok:
+                                per_utterance[modal+"_"+str(i)] = 1
+                        else:
+                            per_utterance[modal+"_"+str(i)] = 1
+        features.append(per_utterance)
+
+    print("Questions?")
+    for i, item in enumerate(features):
+        if i % 2 == 0:
+            print "{0}, {1}".format(i, features[i])
+
+            if (len(features[i]) == 0):
+                print(text[i])
+
+    print("------")
+    print("Answers")
+    for i, item in enumerate(features):
+        if i % 2 != 0:
+            print "{0}, {1}".format(i, features[i])
+
+            if (len(features[i]) > 0):
+                print(text[i])
+
+class QAVectorizer():
+
+  def __init__(self):
+    pass
+
+  def fit(self, raw_documents, y=None):
+    pass
+
+  def fit_transform(self, raw_documents, y=None):
+    pass
+
+  def transform(self, raw_documents):
+    pass
 
 def encode_labels(y):
     """
@@ -129,6 +202,23 @@ def grid_search_pipeline(pipe, params, cv, data, targets):
     print("done in %0.3fs" % (time() - t0))
 
     return grid_search
+
+def qa_mnb_pipeline(data, targets, num_images=11):
+    pipe = Pipeline([
+        ("vect", QAVectorizer()),
+        ("clf", MultinomialNB())
+    ])
+
+    params = {
+        "clf__alpha": (0.001, 0.00001, 0.000001)
+    }
+
+    cv = KFold(len(targets), num_images)
+
+    grid_search = grid_search_pipeline(pipe, params, cv, data, targets)
+
+    #return grid_search.best_estimator_
+    return grid_search, pipe, params
 
 def tfidf_mnb_pipeline(data, targets, num_images=11):
     """
@@ -250,21 +340,23 @@ def get_metrics(baseline_prob, y_test_list, y_pred_list, plot_results=True):
 def main(args):
     if (args.data):
         # Our features and two sets of labels
-        X, y_qa, y_em = read_dir_sk(args.data)
+        s, i, q, X, y_qa, y_em, _ = read_dir_sk(args.data)
 
         y_qa, le_qa = encode_labels(y_qa)
         y_em, le_em = encode_labels(y_em)
 
-        print("--- Q/A ---")
-        qa_grid_search, qa_pipe, qa_params = tfidf_mnb_pipeline(X, y_qa)
-        report_grid_search(qa_grid_search, qa_pipe, qa_params)
-        best_qa_clf = qa_grid_search.best_estimator_
+        q_features(X)
 
-        print
-        print("--- E/M ---")
-        em_grid_search, em_pipe, em_params = tfidf_mnb_pipeline(X, y_em)
-        report_grid_search(em_grid_search, em_pipe, em_params)
-        best_em_clf = em_grid_search.best_estimator_
+        #print("--- Q/A ---")
+        #qa_grid_search, qa_pipe, qa_params = tfidf_mnb_pipeline(X, y_qa)
+        #report_grid_search(qa_grid_search, qa_pipe, qa_params)
+        #best_qa_clf = qa_grid_search.best_estimator_
+
+        #print
+        #print("--- E/M ---")
+        #em_grid_search, em_pipe, em_params = tfidf_mnb_pipeline(X, y_em)
+        #report_grid_search(em_grid_search, em_pipe, em_params)
+        #best_em_clf = em_grid_search.best_estimator_
 
     elif (args.test and args.train):
         s1, i1, q1, train_X, train_y_qa, train_y_em, _ = read_dir_sk(args.train)
