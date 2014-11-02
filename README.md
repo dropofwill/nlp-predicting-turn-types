@@ -13,7 +13,27 @@ Try lots of different ML algorithms and their various tuning parameters availabl
 
 ## Feature ideas:
 
-Question words as features: how, what, where, when, who, etc.?
+*Ways to form questions in English:*
+
+Move the auxiliary verb to beginning of sentence, Subject-auxiliary inversion:
+
+It/PRP is/VBZ snowing/VBG vs. is/VBZ it/PRP snowing?/VBG
+
+Move a modal to the beginning of the sentence.
+
+They/PRP will/MD come/VB vs. Will/MD they/PRP come/VBP
+
+Adding a Wh-\* (WDT, WP, WP$, WRB, in treebank) to the beginning of a sentence, also involves some other syntax rules, Wh-fronting (by far the most common in our dataset)
+
+she/PRP often/RB uses/NNS it/PRP  vs. how/WRB often/RB does/VBZ she/PRP use/NN it?/PRP
+
+Features:
+
+Wh-\* tag in within the first 3 tokens of the sentence
+
+[am, is, are, was, were, have, had, has, do, does, did] within the first 3 tokens of the sentence, but not after a NN\* tag
+
+[can, could, may, might, must, shall, should, will, would] within the first 3 tokens of the sentence, but not after a NN\* tag
 
 *Features that won't be image content specific:*
 
