@@ -18,7 +18,7 @@ from sklearn.naive_bayes import MultinomialNB
 from sklearn.grid_search import GridSearchCV
 from sklearn.pipeline import Pipeline
 from sklearn.cross_validation import KFold
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 from sklearn import metrics
 
 # Hardcode global length of an image document
@@ -52,11 +52,16 @@ def read_dir_sk(path):
     X = []
     y_qa = []
     y_em = []
+    sID = []
+    iID = []
+    qID = []
+    fID = []
     for root, subdirs, files in os.walk(path):
         for f in files:
             if f.endswith(".csv"):
                 a_file_path = os.path.join(root, f)
                 csv = read_csv(a_file_path)
+                fID.append(f)
 
                 for row in csv:
                     y_qa.append(row[3])
@@ -66,29 +71,10 @@ def read_dir_sk(path):
                     # remove brackets around words []
                     text = re.sub(r'(<|>|\[|\]|\*)', '', row[5])
                     X.append(text)
-    return X, y_qa, y_em
-
-def read_dir_dict(path):
-    """
-    Takes a path to a directory of csv data files, parses them individually,
-    Returns an array of dicts
-    """
-    output = []
-    for root, subdirs, files in os.walk(path):
-        for f in files:
-            if f.endswith(".csv"):
-                a_file_path = os.path.join(root, f)
-                csv = read_csv(a_file_path)
-
-                for row in csv:
-                    example = { "subjectID": row[0],
-                                "imageID": row[1],
-                                "questionID": row[2],
-                                "Q/A": row[3],
-                                "E/M": row[4],
-                                "text": row[5] }
-                    output.append(example)
-    return output
+                    sID.append(row[0])
+                    iID.append(row[1])
+                    qID.append(row[2])
+    return sID, iID, qID, X, y_qa, y_em, fID
 
 def q_features(data):
     questionWords = ["who", "what", "where", "when", "why", "[why]", "how", "and"]
@@ -198,12 +184,34 @@ def report_grid_scores(grid_scores, n_top=10):
         print("Parameters: {0}".format(score.parameters))
         print
 
-def get_metrics(y_test_list, y_pred_list, plot_results=True):
+def find_baseline(y_label):
+    count_1 = 0.0
+    count_2 = 0.0
+
+    for item in y_label:
+        if item == 0:
+            count_1 += 1
+        else:
+            count_2 += 1
+
+    if count_1 >= count_2:
+        baseline_prob = count_1 / float(len(y_label))
+    else:
+        baseline_prob = count_2 / float(len(y_label))
+
+    return baseline_prob
+
+
+def get_metrics(baseline_prob, y_test_list, y_pred_list, plot_results=True):
     y_true = y_test_list
-    print(y_true)
 
     y_pred = y_pred_list
-    print(y_pred)
+
+    accuracy = accuracy_score(y_true, y_pred)
+    print 'Accuracy on test data: ' + str(accuracy)
+
+    reduction = accuracy - baseline_prob
+    print 'Error reduction over the majority class baseline: ' + str(reduction)
 
     # report the confusion matrix
     cm = confusion_matrix(y_true, y_pred)
@@ -239,7 +247,6 @@ def get_metrics(y_test_list, y_pred_list, plot_results=True):
         plt.legend(loc="lower right")
         plt.show()
 
-
 def main(args):
     if (args.data):
         # Our features and two sets of labels
@@ -260,13 +267,25 @@ def main(args):
         best_em_clf = em_grid_search.best_estimator_
 
     elif (args.test and args.train):
-        train_X, train_y_qa, train_y_em = read_dir_sk(args.train)
-        test_X, test_y_qa, test_y_em = read_dir_sk(args.test)
+        s1, i1, q1, train_X, train_y_qa, train_y_em, _ = read_dir_sk(args.train)
+        s2, i2, q2, test_X, test_y_qa, test_y_em, test_f_names = read_dir_sk(args.test)
+
+        print(test_f_names)
 
         train_y_qa, le_qa = encode_labels(train_y_qa)
         train_y_em, le_em = encode_labels(train_y_em)
         test_y_qa, le_qa = encode_labels(test_y_qa)
         test_y_em, le_em = encode_labels(test_y_em)
+
+        train_y_qa, le_qa = encode_labels(train_y_qa)
+        train_y_em, le_em = encode_labels(train_y_em)
+        test_y_qa, le_qa = encode_labels(test_y_qa)
+        test_y_em, le_em = encode_labels(test_y_em)
+
+        em_baseline_prob = find_baseline(train_y_em)
+        qa_baseline_prob = find_baseline(train_y_qa)
+        print("Q/A baseline {0}".format(qa_baseline_prob))
+        print("E/M baseline {0}".format(em_baseline_prob))
 
         # how many documents are in the training set?
         len_img_train = int(float(len(train_y_qa))/float(len_img))
@@ -290,11 +309,10 @@ def main(args):
         print
 
         print("Metrics for Q/A task on Image 1")
-        get_metrics(test_y_qa[:40], qa_predictions[:40], False)
+        get_metrics(qa_baseline_prob, test_y_qa[:40], qa_predictions[:40], False)
         print("Metrics for Q/A task on Image 2")
-        get_metrics(test_y_qa[40:], qa_predictions[40:], False)
+        get_metrics(qa_baseline_prob, test_y_qa[40:], qa_predictions[40:], False)
 
-        print
         print("--- E/M ---")
         em_grid_search, em_pipe, em_params = tfidf_mnb_pipeline(train_X,
                                                                 train_y_em,
@@ -312,10 +330,22 @@ def main(args):
         print
 
         print("Metrics for E/M task on Image 1")
-        get_metrics(test_y_em[:40], em_predictions[:40], False)
+        get_metrics(em_baseline_prob, test_y_em[:40], em_predictions[:40], False)
         print("Metrics for E/M task on Image 2")
-        get_metrics(test_y_em[40:], em_predictions[40:], False)
+        get_metrics(em_baseline_prob, test_y_em[40:], em_predictions[40:], False)
 
+        s_i = 0
+        for i, f in enumerate(test_f_names):
+            e_i = (i+1) * 40
+            write_csv(f, s2[s_i:e_i],
+                         i2[s_i:e_i],
+                         q2[s_i:e_i],
+                         qa_predictions[s_i:e_i],
+                         em_predictions[s_i:e_i],
+                         test_X[s_i:e_i])
+            print("length check")
+            print(s_i, e_i)
+            s_i = e_i
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
