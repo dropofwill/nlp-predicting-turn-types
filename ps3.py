@@ -32,6 +32,18 @@ def read_csv(path):
             output.append(row)
     return output
 
+def write_csv(path, subjectID, imageID, questionID, QA, EM, text):
+    with open(path, "wb") as f:
+        writer = csv.writer(f,delimiter=",",dialect="excel")
+        for i in range(len(subjectID)):
+            writer.writerow([subjectID[i],
+                            imageID[i],
+                            questionID[i],
+                            QA[i],
+                            EM[i],
+                            text[i]])
+    return text
+
 def read_dir_sk(path):
     """
     Takes a path to a directory of csv data files, parses them individually,
