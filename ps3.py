@@ -196,20 +196,10 @@ def find_baseline(y_label):
 
     return baseline_prob
 
-<<<<<<< HEAD
-def get_metrics(baseline_prob, y_testfile, y_predfile):
-    # test dataset
-    y_true = y_testfile
-
-    # prediction result
-    y_pred = y_predfile
-=======
-
 def get_metrics(baseline_prob, y_test_list, y_pred_list, plot_results=True):
     y_true = y_test_list
 
     y_pred = y_pred_list
->>>>>>> master
 
     accuracy = accuracy_score(y_true, y_pred)
     print 'Accuracy on test data: ' + str(accuracy)
