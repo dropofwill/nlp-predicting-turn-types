@@ -11,12 +11,6 @@ Try feature selection to see how something like SelectKBest or the like would ef
 
 Try lots of different ML algorithms and their various tuning parameters available in Sklearn.
 
-Split data further leaving one out to simulate the test environment.
-
-Produce the necessary performance measures for reporting purposes.
-
-Output CSV with our predictions in the same format as the input.
-
 ## Feature ideas:
 
 Question words as features: how, what, where, when, who, etc.?
