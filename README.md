@@ -11,12 +11,6 @@ Try feature selection to see how something like SelectKBest or the like would ef
 
 Try lots of different ML algorithms and their various tuning parameters available in Sklearn.
 
-Split data further leaving one out to simulate the test environment.
-
-Produce the necessary performance measures for reporting purposes.
-
-Output CSV with our predictions in the same format as the input.
-
 ## Feature ideas:
 
 Question words as features: how, what, where, when, who, etc.?
@@ -59,3 +53,9 @@ Ryan Dennehy, Tong Liu, & Will Paul
 8. Conclusion
 
 9. References, as applicable
+
+## Process Notes for the Presentation
+
+When we used the default cross validation scheme, which randomly mixes the data across documents, performance approached a 100% on the Q/A task and 87% on the E/M task. However, when we implemented the leave one out cross-validation technique, out results came back to earth, with 73% on the Q/A task and 66% on the E/M task.
+
+This tells us that the bag of words features weren't generalizing well enough (as expected) across domains (the various images). So we had to find some less content specific features.
