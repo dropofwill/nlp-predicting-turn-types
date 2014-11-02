@@ -176,10 +176,10 @@ def find_baseline(y_label):
 
 def get_metrics(baseline_prob, y_testfile, y_predfile):
     # test dataset
-    y_true = []
+    y_true = y_testfile
 
     # prediction result
-    y_pred = []
+    y_pred = y_predfile
 
     accuracy = accuracy_score(y_true, y_pred)
     print 'Accuracy on test data: ' + str(accuracy)
