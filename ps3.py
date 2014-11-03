@@ -185,6 +185,10 @@ def q_features(X, begin=0, end=2):
     return features
 
 class QATransformer(base.TransformerMixin):
+    """
+    A stateless transformer that wraps the q_features method
+    for some reason grid serach wants a get_params method...
+    """
     def __init__(self):
         self.params = {}
 
@@ -207,14 +211,9 @@ def encode_labels(y, le=None):
     else:
         le = LabelEncoder()
         y = le.fit_transform(y)
-
-    # example of how to get the labels back:
-    #print le.inverse_transform([1, 0, 1, 0, 1, 0, 1, 0])
     return y, le
 
 def decode_labels(y, le):
-    #print(y)
-    #print le.inverse_transform([1, 0, 1, 0, 1, 0, 1, 0])
     return le.inverse_transform(y)
 
 def grid_search_pipeline(pipe, params, cv, data, targets):
@@ -400,7 +399,6 @@ def main(args):
 
         len_img_train = int(float(len(y_qa))/float(len_img))
 
-        #q_features(X)
         qa_grid_search, qa_pipe, qa_params = qa_mnb_pipeline(X,
                                                             y_qa,
                                                             len_img_train)
@@ -421,8 +419,6 @@ def main(args):
         s1, i1, q1, train_X, train_y_qa, train_y_em, _ = read_dir_sk(args.train)
         s2, i2, q2, test_X, test_y_qa, test_y_em, test_f_names = read_dir_sk(args.test)
 
-        print(test_f_names)
-
         train_y_qa, le_qa = encode_labels(train_y_qa)
         train_y_em, le_em = encode_labels(train_y_em)
         test_y_qa, _ = encode_labels(test_y_qa)
@@ -433,58 +429,66 @@ def main(args):
         test_y_qa, _ = encode_labels(test_y_qa)
         test_y_em, _ = encode_labels(test_y_em)
 
-        print le_qa.inverse_transform([0,1])
-
         em_baseline_prob = find_baseline(train_y_em)
         qa_baseline_prob = find_baseline(train_y_qa)
-        print("Q/A baseline {0}".format(qa_baseline_prob))
-        print("E/M baseline {0}".format(em_baseline_prob))
 
         # how many documents are in the training set?
         len_img_train = int(float(len(train_y_qa))/float(len_img))
         len_img_test = int(float(len(test_y_qa))/float(len_img))
-        print(len_img_train, len_img_test)
+        #print(len_img_train, len_img_test)
 
-        print("--- Q/A ---")
+        print
+        print("----- Q/A -----")
+        print("Q/A baseline {0}".format(qa_baseline_prob))
         qa_grid_search, qa_pipe, qa_params = tfidf_mnb_pipeline(train_X,
                                                                 train_y_qa,
                                                                 len_img_train)
         report_grid_search(qa_grid_search, qa_pipe, qa_params)
         best_qa_clf = qa_grid_search.best_estimator_
 
+        print
         print("Q/A performance on the left out dataset: {0}".format(
-            best_qa_clf.score(test_X, test_y_qa)))
+                best_qa_clf.score(test_X, test_y_qa)))
+
         qa_predictions = best_qa_clf.predict(test_X)
         qa_prob_predictions = best_qa_clf.predict_proba(test_X)
-        print("QA prediction arrays:")
-        print(qa_predictions)
-        print(qa_prob_predictions)
-        print
+        #print("QA prediction arrays:")
+        #print(qa_predictions)
+        #print(qa_prob_predictions)
 
-        print("Metrics for Q/A task on Image 1")
+        print
+        print("Q/A Metrics for Image 1")
         get_metrics(qa_baseline_prob, test_y_qa[:40], qa_predictions[:40], False)
-        print("Metrics for Q/A task on Image 2")
+
+        print
+        print("Q/A Metrics for Image 2")
         get_metrics(qa_baseline_prob, test_y_qa[40:], qa_predictions[40:], False)
 
-        print("--- E/M ---")
+        print
+        print("----- E/M -----")
+        print("E/M baseline {0}".format(em_baseline_prob))
         em_grid_search, em_pipe, em_params = tfidf_mnb_pipeline(train_X,
                                                                 train_y_em,
                                                                 len_img_train)
         report_grid_search(em_grid_search, em_pipe, em_params)
         best_em_clf = em_grid_search.best_estimator_
 
+        print
         print("E/M performance on the left out dataset: {0}".format(
             best_em_clf.score(test_X, test_y_em)))
+
         em_predictions = best_em_clf.predict(test_X)
         em_prob_predictions = best_em_clf.predict_proba(test_X)
-        print("EM prediction arrays:")
-        print(em_predictions)
-        print(em_prob_predictions)
-        print
+        #print("EM prediction arrays:")
+        #print(em_predictions)
+        #print(em_prob_predictions)
 
-        print("Metrics for E/M task on Image 1")
+        print
+        print("E/M Metrics for Image 1")
         get_metrics(em_baseline_prob, test_y_em[:40], em_predictions[:40], False)
-        print("Metrics for E/M task on Image 2")
+
+        print
+        print("E/M Metrics for Image 2")
         get_metrics(em_baseline_prob, test_y_em[40:], em_predictions[40:], False)
 
         qa_human = decode_labels(qa_predictions, le_qa)
