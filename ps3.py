@@ -225,7 +225,7 @@ def grid_search_pipeline(pipe, params, cv, data, targets):
     Returns the results
     """
 
-    grid_search = GridSearchCV(pipe, params, cv=cv, verbose=1)
+    grid_search = GridSearchCV(pipe, params, cv=cv, verbose=1, n_jobs=1)
 
     print("Performing grid search...")
     #print("pipe:", [name for name, _ in pipe.steps])

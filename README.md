@@ -5,7 +5,7 @@ NLP Problem Set 3
 
 More feature extraction techniques (see feature ideas)
 
-Combining feature different feature selection techniques with a feature union, possibly in the pipeline, [like here](http://zacstewart.com/2014/08/05/pipelines-of-featureunions-of-pipelines.html)?
+√ Combining feature different feature selection techniques with a feature union, possibly in the pipeline, [like here](http://zacstewart.com/2014/08/05/pipelines-of-featureunions-of-pipelines.html)?
 
 Try feature selection to see how something like SelectKBest or the like would effect results (add it to the GridSearch?)
 
@@ -41,7 +41,7 @@ Shallow Semantic parsing
 
 Name Entity Recognition
 
-Syntactic features
+√ Syntactic features
 
 ## Reporting Deliverables
 
