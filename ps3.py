@@ -554,19 +554,21 @@ def main(args):
 
         print
         print("--- E/M ---")
-        em_grid_search, em_pipe, em_params = tfidf_mnb_pipeline(train_X,
-                                                                train_y_em,
-                                                                len_img_train)
+        em_grid_search, em_pipe, em_params = POS_svm_pipeline(train_X_pos, train_y_em, len_img_train)
+
+        #em_grid_search, em_pipe, em_params = tfidf_mnb_pipeline(train_X,
+                                                                #train_y_em,
+                                                                #len_img_train)
         report_grid_search(em_grid_search, em_pipe, em_params)
         best_em_clf = em_grid_search.best_estimator_
 
         print
         print("E/M baseline {0}".format(em_baseline_prob))
         print("E/M performance on the left out dataset: {0}".format(
-            best_em_clf.score(test_X, test_y_em)))
+            best_em_clf.score(test_X_pos, test_y_em)))
 
-        em_predictions = best_em_clf.predict(test_X)
-        em_prob_predictions = best_em_clf.predict_proba(test_X)
+        em_predictions = best_em_clf.predict(test_X_pos)
+        #em_prob_predictions = best_em_clf.predict_proba(test_X_pos)
         #print("EM prediction arrays:")
         #print(em_predictions)
         #print(em_prob_predictions)
