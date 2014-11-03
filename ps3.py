@@ -28,6 +28,7 @@ from sklearn import base
 from sklearn.preprocessing import LabelEncoder
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer, TfidfTransformer
 from sklearn.feature_extraction import DictVectorizer
+from sklearn.feature_selection import SelectKBest, chi2
 
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.tree import DecisionTreeClassifier
@@ -238,17 +239,9 @@ def grid_search_pipeline(pipe, params, cv, data, targets):
     return grid_search
 
 def qa_mnb_pipeline(data, targets, num_images=11):
-    #X = q_features(data)
-
-    #pipe = Pipeline([
-        #("vect", DictVectorizer()),
-        #("clf", MultinomialNB())
-    #])
-
-    #params = {
-        #"clf__criterion": ("gini", "entropy")
-    #}
-
+    """
+    A Q/A specific pipeline
+    """
     # Combine tfidf ngram and qa dict features and pass to a single clf
     pipe = Pipeline([
         ("features", FeatureUnion([
@@ -259,18 +252,22 @@ def qa_mnb_pipeline(data, targets, num_images=11):
             ("tfidf", TfidfVectorizer(stop_words="english"))
         ],
         # Weight the syntax rules more heavily then the ngrams
-        transformer_weights={"qa_pipe": 7, "tfidf": 3})),
+        transformer_weights={"qa_pipe": 7, "tfidf": 3}
+        )),
+        ("selection", SelectKBest()),
         ("clf", MultinomialNB())
     ])
 
     params = {
-        "clf__alpha": (1, 0.1, 0.001, 0.00001, 0.000001)
+        "clf__alpha": (1, 0.1, 0.001, 0.00001, 0.000001),
+        #"features__transformer_weights": (  None,
+                                            #{"qa_pipe": 0.25, "tfidf": 0.75},
+                                            #{"qa_pipe": 0.75, "tfidf": 0.25}),
+        "selection__k": (10, 100, "all")
     }
 
     cv = KFold(len(targets), num_images)
-
     grid_search = grid_search_pipeline(pipe, params, cv, data, targets)
-
     return grid_search, pipe, params
 
 def tfidf_mnb_pipeline(data, targets, num_images=11):
@@ -296,9 +293,7 @@ def tfidf_mnb_pipeline(data, targets, num_images=11):
     }
 
     cv = KFold(len(targets), num_images)
-
     grid_search = grid_search_pipeline(pipe, params, cv, data, targets)
-
     return grid_search, pipe, params
 
 def report_grid_search(grid_search, pipe, params):
@@ -440,9 +435,9 @@ def main(args):
         print
         print("----- Q/A -----")
         print("Q/A baseline {0}".format(qa_baseline_prob))
-        qa_grid_search, qa_pipe, qa_params = tfidf_mnb_pipeline(train_X,
-                                                                train_y_qa,
-                                                                len_img_train)
+        qa_grid_search, qa_pipe, qa_params = qa_mnb_pipeline(train_X,
+                                                            train_y_qa,
+                                                            len_img_train)
         report_grid_search(qa_grid_search, qa_pipe, qa_params)
         best_qa_clf = qa_grid_search.best_estimator_
 
