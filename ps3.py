@@ -1,6 +1,19 @@
 """
 Team Challenge: Predicting Turn Types
 Authors: Tong, Will, and Ryan
+
+Expects a path to a directory of CSVs, either one directory for K-fold cross
+validation or two folders, one for training and one for testing.
+
+    --data  Path to single directory for tuning
+or
+    --train To directory for training data
+    --test  To directory for testing data
+
+When a test directory is given it produces duplicates of those files, except
+this time with it's own predictions for the Q/A and E/M tasks.
+
+Otherwise it prints to the terminal information about it's performance.
 """
 
 import os, re, sys, csv, argparse, logging
@@ -37,30 +50,32 @@ def read_csv(path):
             output.append(row)
     return output
 
-def write_csv(path, subjectID, imageID, questionID, QA, EM, text):
+def write_csv(path, subjectID, imageID, questionID, qa, em, text):
     with open(path, "wb") as f:
         writer = csv.writer(f,delimiter=",",dialect="excel")
         for i in range(len(subjectID)):
-            writer.writerow([subjectID[i],
-                            imageID[i],
-                            questionID[i],
-                            QA[i],
-                            EM[i],
-                            text[i]])
+            writer.writerow([subjectID[i], imageID[i], questionID[i],
+                            qa[i], em[i], text[i]])
     return text
+
+def export_submission_csv(  filenames, subjectID, imageID, questionID,
+                            qa, em, text, breakpoint=len_img):
+    s_i = 0
+    for i, f in enumerate(filenames):
+        e_i = (i+1) * breakpoint
+        write_csv(f, subjectID[s_i:e_i], imageID[s_i:e_i],
+                     questionID[s_i:e_i], qa[s_i:e_i],
+                     em[s_i:e_i], text[s_i:e_i])
+        #print("length check")
+        #print(s_i, e_i)
+        s_i = e_i
 
 def read_dir_sk(path):
     """
     Takes a path to a directory of csv data files, parses them individually,
     Returns an array of dicts, array of qa labels, and an array of em labels
     """
-    X = []
-    y_qa = []
-    y_em = []
-    sID = []
-    iID = []
-    qID = []
-    fID = []
+    X, y_qa, y_em, sID, iID, qID, fID = [], [], [], [], [], [], []
     for root, subdirs, files in os.walk(path):
         for f in files:
             if f.endswith(".csv"):
@@ -82,6 +97,10 @@ def read_dir_sk(path):
     return sID, iID, qID, X, y_qa, y_em, fID
 
 def q_features(X, begin=0, end=2):
+    """
+    Takes a list of raw strings as input
+    Returns a dict of binary features that imply the sentence is a question
+    """
     wh_words = [    # Wh-pronouns
                     "what", "which", "who", "whom",
                     # Wh-possesive
@@ -178,17 +197,25 @@ class QATransformer(base.TransformerMixin):
     def get_params(self, deep):
         return self.params
 
-def encode_labels(y):
+def encode_labels(y, le=None):
     """
     Takes a list of labels and converts them to numpy compatible classes
     Returns (the converted labels, and the encoder)
     """
-    le = LabelEncoder()
-    y = le.fit_transform(y)
+    if le:
+        y = le.fit_params(y)
+    else:
+        le = LabelEncoder()
+        y = le.fit_transform(y)
 
     # example of how to get the labels back:
-    # print le.inverse_transform([1, 0, 1, 0, 1, 0, 1, 0])
+    #print le.inverse_transform([1, 0, 1, 0, 1, 0, 1, 0])
     return y, le
+
+def decode_labels(y, le):
+    #print(y)
+    #print le.inverse_transform([1, 0, 1, 0, 1, 0, 1, 0])
+    return le.inverse_transform(y)
 
 def grid_search_pipeline(pipe, params, cv, data, targets):
     """
@@ -223,6 +250,7 @@ def qa_mnb_pipeline(data, targets, num_images=11):
         #"clf__criterion": ("gini", "entropy")
     #}
 
+    # Combine tfidf ngram and qa dict features and pass to a single clf
     pipe = Pipeline([
         ("features", FeatureUnion([
             ("qa_pipe", Pipeline([
@@ -261,11 +289,11 @@ def tfidf_mnb_pipeline(data, targets, num_images=11):
     params = {
         #"vect__max_df": (0.5, 0.75, 1.0),
         #"vect__max_features": (None, 5000, 10000, 50000),
-        "vect__use_idf": (True, False),
+        #"vect__use_idf": (True, False),
         "vect__analyzer": ("word", "char", "char_wb"),
-        "vect__ngram_range": ((1,2), (1,3), (1,1)),
+        #"vect__ngram_range": ((1,2), (1,3), (1,1)),
         #"vect__norm": ("l1", "l2"),
-        "clf__alpha": (0.001, 0.00001, 0.000001)
+        #"clf__alpha": (0.001, 0.00001, 0.000001)
     }
 
     cv = KFold(len(targets), num_images)
@@ -397,13 +425,15 @@ def main(args):
 
         train_y_qa, le_qa = encode_labels(train_y_qa)
         train_y_em, le_em = encode_labels(train_y_em)
-        test_y_qa, le_qa = encode_labels(test_y_qa)
-        test_y_em, le_em = encode_labels(test_y_em)
+        test_y_qa, _ = encode_labels(test_y_qa)
+        test_y_em, _ = encode_labels(test_y_em)
 
-        train_y_qa, le_qa = encode_labels(train_y_qa)
-        train_y_em, le_em = encode_labels(train_y_em)
-        test_y_qa, le_qa = encode_labels(test_y_qa)
-        test_y_em, le_em = encode_labels(test_y_em)
+        train_y_qa, _ = encode_labels(train_y_qa)
+        train_y_em, _ = encode_labels(train_y_em)
+        test_y_qa, _ = encode_labels(test_y_qa)
+        test_y_em, _ = encode_labels(test_y_em)
+
+        print le_qa.inverse_transform([0,1])
 
         em_baseline_prob = find_baseline(train_y_em)
         qa_baseline_prob = find_baseline(train_y_qa)
@@ -457,18 +487,11 @@ def main(args):
         print("Metrics for E/M task on Image 2")
         get_metrics(em_baseline_prob, test_y_em[40:], em_predictions[40:], False)
 
-        s_i = 0
-        for i, f in enumerate(test_f_names):
-            e_i = (i+1) * 40
-            write_csv(f, s2[s_i:e_i],
-                         i2[s_i:e_i],
-                         q2[s_i:e_i],
-                         qa_predictions[s_i:e_i],
-                         em_predictions[s_i:e_i],
-                         test_X[s_i:e_i])
-            print("length check")
-            print(s_i, e_i)
-            s_i = e_i
+        qa_human = decode_labels(qa_predictions, le_qa)
+        em_human = decode_labels(em_predictions, le_em)
+
+        export_submission_csv(  test_f_names, s2, i2, q2,
+                                qa_human, em_human, test_X)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
