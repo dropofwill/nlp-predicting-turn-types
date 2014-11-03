@@ -3,3 +3,4 @@ PS3_train/
 PS3_test/
 
 *.csv
+.idea/*
