@@ -11,6 +11,7 @@ from operator import itemgetter
 import numpy as np
 import matplotlib.pyplot as plt
 
+from sklearn import base
 from sklearn.preprocessing import LabelEncoder
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer, TfidfTransformer
 from sklearn.feature_extraction import DictVectorizer
@@ -18,7 +19,7 @@ from sklearn.feature_extraction import DictVectorizer
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.grid_search import GridSearchCV
-from sklearn.pipeline import Pipeline
+from sklearn.pipeline import Pipeline, FeatureUnion
 from sklearn.cross_validation import KFold
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
 from sklearn import metrics
@@ -145,24 +146,37 @@ def q_features(X, begin=0, end=2):
                             per_utterance[modal+"_"+str(i)] = 1
         features.append(per_utterance)
 
-    print("Questions?")
-    for i, item in enumerate(features):
-        if i % 2 == 0:
-            print "{0}, {1}".format(i, features[i])
+    #print("Questions?")
+    #for i, item in enumerate(features):
+        #if i % 2 == 0:
+            #print "{0}, {1}".format(i, features[i])
 
-            if (len(features[i]) == 0):
-                print(text[i])
+            #if (len(features[i]) == 0):
+                #print(text[i])
 
-    print("------")
-    print("Answers")
-    for i, item in enumerate(features):
-        if i % 2 != 0:
-            print "{0}, {1}".format(i, features[i])
+    #print("------")
+    #print("Answers")
+    #for i, item in enumerate(features):
+        #if i % 2 != 0:
+            #print "{0}, {1}".format(i, features[i])
 
-            if (len(features[i]) > 0):
-                print(text[i])
+            #if (len(features[i]) > 0):
+                #print(text[i])
 
     return features
+
+class QATransformer(base.TransformerMixin):
+    def __init__(self):
+        self.params = {}
+
+    def transform(self, X, **transform_params):
+        return q_features(X)
+
+    def fit(self, X, y=None, **fit_params):
+        return self
+
+    def get_params(self, deep):
+        return self.params
 
 def encode_labels(y):
     """
@@ -187,9 +201,9 @@ def grid_search_pipeline(pipe, params, cv, data, targets):
     grid_search = GridSearchCV(pipe, params, cv=cv, verbose=1)
 
     print("Performing grid search...")
-    print("pipe:", [name for name, _ in pipe.steps])
-    print("params:")
-    pprint(params)
+    #print("pipe:", [name for name, _ in pipe.steps])
+    #print("params:")
+    #pprint(params)
     print
     t0 = time()
     grid_search.fit(data, targets)
@@ -198,33 +212,38 @@ def grid_search_pipeline(pipe, params, cv, data, targets):
     return grid_search
 
 def qa_mnb_pipeline(data, targets, num_images=11):
-    X = q_features(data)
+    #X = q_features(data)
 
     #pipe = Pipeline([
         #("vect", DictVectorizer()),
         #("clf", MultinomialNB())
     #])
 
-    params = {
-        "clf__alpha": (0.001, 0.00001, 0.000001)
-    }
+    #params = {
+        #"clf__criterion": ("gini", "entropy")
+    #}
 
     pipe = Pipeline([
-        ("vect", DictVectorizer(sparse=False)),
-        ("clf", DecisionTreeClassifier(random_state=42))
+        ("features", FeatureUnion([
+            ("qa_pipe", Pipeline([
+                ("qa_trans", QATransformer()),
+                ("dict_vect", DictVectorizer()),
+            ])),
+            ("tfidf", TfidfVectorizer(stop_words="english"))
+        ],
+        # Weight the syntax rules more heavily then the ngrams
+        transformer_weights={"qa_pipe": 7, "tfidf": 3})),
+        ("clf", MultinomialNB())
     ])
 
     params = {
-        "clf__criterion": ("gini", "entropy")
+        "clf__alpha": (1, 0.1, 0.001, 0.00001, 0.000001)
     }
 
     cv = KFold(len(targets), num_images)
 
-    grid_search = grid_search_pipeline(pipe, params, cv, X, targets)
+    grid_search = grid_search_pipeline(pipe, params, cv, data, targets)
 
-    best = grid_search.best_estimator_
-    print(grid_search.steps[0])
-    #print(best.feature_importance_)
     return grid_search, pipe, params
 
 def tfidf_mnb_pipeline(data, targets, num_images=11):
