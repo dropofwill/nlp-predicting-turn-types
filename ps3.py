@@ -13,8 +13,10 @@ import matplotlib.pyplot as plt
 
 from sklearn.preprocessing import LabelEncoder
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer, TfidfTransformer
+from sklearn.feature_extraction import DictVectorizer
 
 from sklearn.naive_bayes import MultinomialNB
+from sklearn.tree import DecisionTreeClassifier
 from sklearn.grid_search import GridSearchCV
 from sklearn.pipeline import Pipeline
 from sklearn.cross_validation import KFold
@@ -87,20 +89,22 @@ def q_features(X, begin=0, end=2):
                     "how", "when", "where", "why",
                     # Wh-* with 's
                     "what's", "who's"]
+
     ans_words = [   # non-speech disfluencies
                     "sp", "{sl}", "{ls}", "{cg}", "{ns}", "{br}",
                     # speech disfluencies
                     "uh", "um", "hm", "mm"
                     # conjunctions and sentence starter words
                     "well", "and", "but", "yet"]
+
     aux_verbs = ["am", "is", "are", "was", "were",
                 "have", "had", "has",
                 "do", "does", "did"]
+
     modal_verbs = ["can", "could",
                   "may", "might", "must",
                   "shall", "should",
                   "will", "would"]
-
     features = []
     text = []
     for sentence in X:
@@ -113,6 +117,7 @@ def q_features(X, begin=0, end=2):
                 for wh in wh_words:
                     if tokens[i] == wh:
                         per_utterance[wh+"_"+str(i)] = 1
+
                 for aux in aux_verbs:
                     if tokens[i] == aux:
                         # Only match if the first, non ans_word
@@ -125,6 +130,7 @@ def q_features(X, begin=0, end=2):
                                 per_utterance[aux+"_"+str(i)] = 1
                         else:
                             per_utterance[aux+"_"+str(i)] = 1
+
                 for modal in modal_verbs:
                     if tokens[i] == modal:
                         # Only match if the first, non ans_word
@@ -156,19 +162,7 @@ def q_features(X, begin=0, end=2):
             if (len(features[i]) > 0):
                 print(text[i])
 
-class QAVectorizer():
-
-  def __init__(self):
-    pass
-
-  def fit(self, raw_documents, y=None):
-    pass
-
-  def fit_transform(self, raw_documents, y=None):
-    pass
-
-  def transform(self, raw_documents):
-    pass
+    return features
 
 def encode_labels(y):
     """
@@ -204,20 +198,33 @@ def grid_search_pipeline(pipe, params, cv, data, targets):
     return grid_search
 
 def qa_mnb_pipeline(data, targets, num_images=11):
-    pipe = Pipeline([
-        ("vect", QAVectorizer()),
-        ("clf", MultinomialNB())
-    ])
+    X = q_features(data)
+
+    #pipe = Pipeline([
+        #("vect", DictVectorizer()),
+        #("clf", MultinomialNB())
+    #])
 
     params = {
         "clf__alpha": (0.001, 0.00001, 0.000001)
     }
 
+    pipe = Pipeline([
+        ("vect", DictVectorizer(sparse=False)),
+        ("clf", DecisionTreeClassifier(random_state=42))
+    ])
+
+    params = {
+        "clf__criterion": ("gini", "entropy")
+    }
+
     cv = KFold(len(targets), num_images)
 
-    grid_search = grid_search_pipeline(pipe, params, cv, data, targets)
+    grid_search = grid_search_pipeline(pipe, params, cv, X, targets)
 
-    #return grid_search.best_estimator_
+    best = grid_search.best_estimator_
+    print(grid_search.steps[0])
+    #print(best.feature_importance_)
     return grid_search, pipe, params
 
 def tfidf_mnb_pipeline(data, targets, num_images=11):
@@ -246,7 +253,6 @@ def tfidf_mnb_pipeline(data, targets, num_images=11):
 
     grid_search = grid_search_pipeline(pipe, params, cv, data, targets)
 
-    #return grid_search.best_estimator_
     return grid_search, pipe, params
 
 def report_grid_search(grid_search, pipe, params):
@@ -345,7 +351,13 @@ def main(args):
         y_qa, le_qa = encode_labels(y_qa)
         y_em, le_em = encode_labels(y_em)
 
-        q_features(X)
+        len_img_train = int(float(len(y_qa))/float(len_img))
+
+        #q_features(X)
+        qa_grid_search, qa_pipe, qa_params = qa_mnb_pipeline(X,
+                                                            y_qa,
+                                                            len_img_train)
+        report_grid_search(qa_grid_search, qa_pipe, qa_params)
 
         #print("--- Q/A ---")
         #qa_grid_search, qa_pipe, qa_params = tfidf_mnb_pipeline(X, y_qa)
