@@ -16,7 +16,7 @@ this time with it's own predictions for the Q/A and E/M tasks.
 Otherwise it prints to the terminal information about it's performance.
 """
 
-import os, re, sys, csv, argparse, logging
+import os, re, sys, csv, argparse, logging, nltk
 from pprint import pprint
 from time import time
 
@@ -36,7 +36,7 @@ from sklearn.grid_search import GridSearchCV
 from sklearn.pipeline import Pipeline, FeatureUnion
 from sklearn.cross_validation import KFold
 from sklearn.metrics import classification_report, confusion_matrix, accuracy_score
-from sklearn import metrics
+from sklearn import svm, metrics
 
 from nltk import word_tokenize
 
@@ -53,7 +53,7 @@ def read_csv(path):
 
 def write_csv(path, subjectID, imageID, questionID, qa, em, text):
     with open(path, "wb") as f:
-        writer = csv.writer(f,delimiter=",",dialect="excel")
+        writer = csv.writer(f, delimiter=",", dialect="excel")
         for i in range(len(subjectID)):
             writer.writerow([subjectID[i], imageID[i], questionID[i],
                             qa[i], em[i], text[i]])
@@ -76,7 +76,8 @@ def read_dir_sk(path):
     Takes a path to a directory of csv data files, parses them individually,
     Returns an array of dicts, array of qa labels, and an array of em labels
     """
-    X, y_qa, y_em, sID, iID, qID, fID = [], [], [], [], [], [], []
+    X, X_pos, y_qa, y_em, sID, iID, qID, fID = [], [], [], [], [], [], [], []
+
     for root, subdirs, files in os.walk(path):
         for f in files:
             if f.endswith(".csv"):
@@ -92,10 +93,13 @@ def read_dir_sk(path):
                     # remove brackets around words []
                     text = re.sub(r'(<|>|\[|\]|\*)', '', row[5])
                     X.append(text)
+                    token = text.split()
+                    pos_tag = nltk.pos_tag(token)
+                    X_pos.append(pos_tag)
                     sID.append(row[0])
                     iID.append(row[1])
                     qID.append(row[2])
-    return sID, iID, qID, X, y_qa, y_em, fID
+    return sID, iID, qID, X, X_pos, y_qa, y_em, fID
 
 def q_features(X, begin=0, end=2):
     """
@@ -202,6 +206,63 @@ class QATransformer(base.TransformerMixin):
     def get_params(self, deep):
         return self.params
 
+
+def POS_feature_convertor(pos_tag, tags_to_replace=['VB']):
+
+    newtext = []
+    match = False
+
+    # token = text.split()
+    # pos_tag = nltk.pos_tag(token)
+
+    for item in pos_tag:
+        word = item[0]
+        pos = item[1]
+
+        for tag in tags_to_replace:
+            if pos == tag:
+                newtext.append(pos)
+                match = True
+            else:
+                newtext.append(word)
+
+    return newtext
+
+def POS_svm_pipeline(data, targets, num_images=11):
+    """
+    A simple pipeline using POS as features, support vector machine, and KFold
+    cross validation such that on each run one image file is left out (set
+    num_images differently if working on a smaller training set)
+    Returns the grid_search results, pipeline, and parameters used
+    """
+    pipe = Pipeline([
+        ("vect", TfidfVectorizer(preprocessor=pass_input,tokenizer=POS_feature_convertor)),
+        ("clf", svm.LinearSVC())
+        #("clf", MultinomialNB())
+    ])
+
+    params = {
+        "vect__use_idf": (True, False),
+        # "vect__sublinear_tf": (True, False),
+        # "vect__smooth_idf": (True, False),
+        "vect__ngram_range": ((1, 1), (1, 2), (1, 3))
+        # "vect__norm": ("l1", "l2")
+        # "vect__stop_words": ("english", None)
+        # "clf__C": (0.1, 0.0, 1.0, 10.0),
+        # "clf__loss": ("l1", "l2"),
+        # "clf__penalty": ("l1", "l2"),
+        # "clf__dual": (True, False),
+        # "clf__tol": (1, 1e-1, 1e-2, 1e-3, 1e-4),
+        # "clf__fit_intercept": (True, False),
+    }
+
+    cv = KFold(len(targets), num_images)
+
+    grid_search = grid_search_pipeline(pipe, params, cv, data, targets)
+
+    return grid_search, pipe, params
+
+
 def encode_labels(y, le=None):
     """
     Takes a list of labels and converts them to numpy compatible classes
@@ -283,18 +344,19 @@ def tfidf_mnb_pipeline(data, targets, num_images=11):
     ])
 
     params = {
-        #"vect__max_df": (0.5, 0.75, 1.0),
-        #"vect__max_features": (None, 5000, 10000, 50000),
-        #"vect__use_idf": (True, False),
-        "vect__analyzer": ("word", "char", "char_wb"),
-        #"vect__ngram_range": ((1,2), (1,3), (1,1)),
-        #"vect__norm": ("l1", "l2"),
-        #"clf__alpha": (0.001, 0.00001, 0.000001)
+        # "vect__max_df": (0.5, 0.75, 1.0),
+        # "vect__max_features": (None, 5000, 10000, 50000),
+        "vect__use_idf": (True, False),
+        "vect__analyzer": ("word", "char"),
+        "vect__ngram_range": ((1, 2), (1, 3), (1, 1)),
+        "vect__norm": ("l1", "l2"),
+        "clf__alpha": (0.001, 0.00001, 0.000001)
     }
 
     cv = KFold(len(targets), num_images)
     grid_search = grid_search_pipeline(pipe, params, cv, data, targets)
     return grid_search, pipe, params
+
 
 def report_grid_search(grid_search, pipe, params):
     """
@@ -308,6 +370,7 @@ def report_grid_search(grid_search, pipe, params):
 
     report_grid_scores(grid_search.grid_scores_)
 
+
 def report_grid_scores(grid_scores, n_top=10):
     """
     Helper function to report score performance of the top n classifier / params
@@ -315,11 +378,12 @@ def report_grid_scores(grid_scores, n_top=10):
     top_scores = sorted(grid_scores, key=itemgetter(1), reverse=True)[:n_top]
     for i, score in enumerate(top_scores):
         print("{2}. Mean validation score: {0:.3f} (std: {1:.3f})".format(
-              score.mean_validation_score,
-              np.std(score.cv_validation_scores),
-              i + 1 ))
+            score.mean_validation_score,
+            np.std(score.cv_validation_scores),
+            i + 1))
         print("Parameters: {0}".format(score.parameters))
         print
+
 
 def find_baseline(y_label):
     count_1 = 0.0
@@ -384,35 +448,64 @@ def get_metrics(baseline_prob, y_test_list, y_pred_list, plot_results=True):
         plt.legend(loc="lower right")
         plt.show()
 
+def pass_input(input):
+    """
+    Needed to override default preprocessor in Skleran *Vectorizers
+    """
+    return input
+
 def main(args):
     if (args.data):
         # Our features and two sets of labels
-        s, i, q, X, y_qa, y_em, _ = read_dir_sk(args.data)
+        s1, i1, q1,             \
+        train_X, train_X_pos,   \
+        train_y_qa, train_y_em, _ = read_dir_sk(args.data)
 
-        y_qa, le_qa = encode_labels(y_qa)
-        y_em, le_em = encode_labels(y_em)
+        len_img_train = int(float(len(train_y_qa))/float(len_img))
+        train_y_qa, le_qa = encode_labels(train_y_qa)
+        train_y_em, le_em = encode_labels(train_y_em)
 
-        len_img_train = int(float(len(y_qa))/float(len_img))
+        #print POS_feature_convertor(train_X_pos[0])
+        # pos_vectorizer = TfidfVectorizer(preprocessor=pass_input, tokenizer=POS_feature_convertor, ngram_range=(1, 2))
+        # print pos_vectorizer.fit_transform(train_X_pos).toarray().shape
 
-        qa_grid_search, qa_pipe, qa_params = qa_mnb_pipeline(X,
-                                                            y_qa,
-                                                            len_img_train)
+        print("--- Q/A ---")
+        # Tong's SVM Token/POS pipeline
+        qa_grid_search, qa_pipe, qa_params = POS_svm_pipeline(train_X_pos, train_y_qa)
         report_grid_search(qa_grid_search, qa_pipe, qa_params)
+        best_qa_clf = qa_grid_search.best_estimator_
 
-        #print("--- Q/A ---")
-        #qa_grid_search, qa_pipe, qa_params = tfidf_mnb_pipeline(X, y_qa)
+        # Will's MNB Syntax Rules > Ngrams pipeline
+        #qa_grid_search, qa_pipe, qa_params = qa_mnb_pipeline(train_X,
+                                                            #train_y_qa,
+                                                            #len_img_train)
+        #report_grid_search(qa_grid_search, qa_pipe, qa_params)
+
+        # Basic TFIDF feature set of Ngrams
+        #qa_grid_search, qa_pipe, qa_params = tfidf_mnb_pipeline(train_X, train_y_qa)
         #report_grid_search(qa_grid_search, qa_pipe, qa_params)
         #best_qa_clf = qa_grid_search.best_estimator_
 
-        #print
-        #print("--- E/M ---")
+        print
+        print("--- E/M ---")
+        # Tong's SVM Token/POS pipeline
+        em_grid_search, em_pipe, em_params = POS_svm_pipeline(train_X_pos, train_y_em)
+        report_grid_search(em_grid_search, em_pipe, em_params)
+        best_em_clf = em_grid_search.best_estimator_
+
+        # Basic TFIDF feature set of Ngrams
         #em_grid_search, em_pipe, em_params = tfidf_mnb_pipeline(X, y_em)
         #report_grid_search(em_grid_search, em_pipe, em_params)
         #best_em_clf = em_grid_search.best_estimator_
 
     elif (args.test and args.train):
-        s1, i1, q1, train_X, train_y_qa, train_y_em, _ = read_dir_sk(args.train)
-        s2, i2, q2, test_X, test_y_qa, test_y_em, test_f_names = read_dir_sk(args.test)
+        s1, i1, q1,             \
+        train_X, train_X_pos,   \
+        train_y_qa, train_y_em, _ = read_dir_sk(args.train)
+
+        s2, i2, q2,             \
+        test_X, test_X_pos,     \
+        test_y_qa, test_y_em, test_f_names = read_dir_sk(args.test)
 
         train_y_qa, le_qa = encode_labels(train_y_qa)
         train_y_em, le_em = encode_labels(train_y_em)
@@ -433,8 +526,7 @@ def main(args):
         #print(len_img_train, len_img_test)
 
         print
-        print("----- Q/A -----")
-        print("Q/A baseline {0}".format(qa_baseline_prob))
+        print("--- Q/A ---")
         qa_grid_search, qa_pipe, qa_params = qa_mnb_pipeline(train_X,
                                                             train_y_qa,
                                                             len_img_train)
@@ -442,6 +534,7 @@ def main(args):
         best_qa_clf = qa_grid_search.best_estimator_
 
         print
+        print("Q/A baseline {0}".format(qa_baseline_prob))
         print("Q/A performance on the left out dataset: {0}".format(
                 best_qa_clf.score(test_X, test_y_qa)))
 
@@ -460,8 +553,7 @@ def main(args):
         get_metrics(qa_baseline_prob, test_y_qa[40:], qa_predictions[40:], False)
 
         print
-        print("----- E/M -----")
-        print("E/M baseline {0}".format(em_baseline_prob))
+        print("--- E/M ---")
         em_grid_search, em_pipe, em_params = tfidf_mnb_pipeline(train_X,
                                                                 train_y_em,
                                                                 len_img_train)
@@ -469,6 +561,7 @@ def main(args):
         best_em_clf = em_grid_search.best_estimator_
 
         print
+        print("E/M baseline {0}".format(em_baseline_prob))
         print("E/M performance on the left out dataset: {0}".format(
             best_em_clf.score(test_X, test_y_em)))
 
@@ -496,11 +589,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     # If no explicit training data, algorithm splits it itself
-    parser.add_argument( "-d", "--data", help="pass a folder path to the data")
+    parser.add_argument("-d", "--data", help="pass a folder path to the data")
 
     # Otherwise
-    parser.add_argument( "-t", "--train", help="pass a folder path to the training data")
-    parser.add_argument( "-s", "--test", help="pass a folder path to the testing data")
+    parser.add_argument("-t", "--train", help="pass a folder path to the training data")
+    parser.add_argument("-s", "--test", help="pass a folder path to the testing data")
 
     args = parser.parse_args()
     main(args)
