@@ -49,6 +49,7 @@ def read_dir_sk(path):
     Returns an array of dicts, array of qa labels, and an array of em labels
     """
     X = []
+    X_pos = []
     y_qa = []
     y_em = []
     sID = []
@@ -70,10 +71,13 @@ def read_dir_sk(path):
                     # remove brackets around words []
                     text = re.sub(r'(<|>|\[|\]|\*)', '', row[5])
                     X.append(text)
+                    token = text.split()
+                    pos_tag = nltk.pos_tag(token)
+                    X_pos.append(pos_tag)
                     sID.append(row[0])
                     iID.append(row[1])
                     qID.append(row[2])
-    return sID, iID, qID, X, y_qa, y_em, fID
+    return sID, iID, qID, X, X_pos, y_qa, y_em, fID
 
 
 def q_features(data):
@@ -98,33 +102,26 @@ def q_features(data):
     print("Ratio: ", (qCount + aCount) / totalCount)
 
 
-def POS_feature_convert(X):
-    tags_to_replace = ['NN']
+def POS_feature_convertor(pos_tag, tags_to_replace=['VB']):
 
-    newX = []
+    newtext = []
+    match = False
 
-    for text in X:
-        newtext = []
-        match = False
+    # token = text.split()
+    # pos_tag = nltk.pos_tag(token)
 
-        token = text.split()
-        pos_tag = nltk.pos_tag(token)
+    for item in pos_tag:
+        word = item[0]
+        pos = item[1]
 
-        for item in pos_tag:
-            word = item[0]
-            pos = item[1]
+        for tag in tags_to_replace:
+            if pos == tag:
+                newtext.append(pos)
+                match = True
+            else:
+                newtext.append(word)
 
-            for tag in tags_to_replace:
-                if pos == tag:
-                    newtext.append(pos)
-                    match = True
-                else:
-                    newtext.append(word)
-        # print newtext
-        newX.append(newtext)
-
-    return newX
-
+    return newtext
 
 def POS_svm_pipeline(data, targets, num_images=11):
     """
@@ -134,22 +131,24 @@ def POS_svm_pipeline(data, targets, num_images=11):
     Returns the grid_search results, pipeline, and parameters used
     """
     pipe = Pipeline([
-        ("vect", TfidfVectorizer(analyzer='word', stop_words="english")),
+        ("vect", TfidfVectorizer(preprocessor=pass_input,tokenizer=POS_feature_convertor)),
         ("clf", svm.LinearSVC())
+        #("clf", MultinomialNB())
     ])
 
     params = {
         "vect__use_idf": (True, False),
-        "vect__sublinear_tf": (True, False),
-        "vect__smooth_idf": (True, False),
-        "vect__ngram_range": ((1, 1), (1, 2), (1, 3)),
-        "vect__norm": ("l1", "l2"),
-        "clf__C": (0.1, 0.0, 1.0, 10.0),
-        "clf__loss": ("l1", "l2"),
-        "clf__penalty": ("l1", "l2"),
-        "clf__dual": (True, False),
-        "clf__tol": (1, 1e-1, 1e-2, 1e-3, 1e-4),
-        "clf__fit_intercept": (True, False),
+        # "vect__sublinear_tf": (True, False),
+        # "vect__smooth_idf": (True, False),
+        "vect__ngram_range": ((1, 1), (1, 2), (1, 3))
+        # "vect__norm": ("l1", "l2")
+        # "vect__stop_words": ("english", None)
+        # "clf__C": (0.1, 0.0, 1.0, 10.0),
+        # "clf__loss": ("l1", "l2"),
+        # "clf__penalty": ("l1", "l2"),
+        # "clf__dual": (True, False),
+        # "clf__tol": (1, 1e-1, 1e-2, 1e-3, 1e-4),
+        # "clf__fit_intercept": (True, False),
     }
 
     cv = KFold(len(targets), num_images)
@@ -314,15 +313,39 @@ def get_metrics(baseline_prob, y_test_list, y_pred_list, plot_results=True):
         plt.legend(loc="lower right")
         plt.show()
 
+def pass_input(input):
+    """
+    Needed to override default preprocessor in Skleran *Vectorizers
+    """
+    return input
 
 def main(args):
     if (args.data):
         # Our features and two sets of labels
-        s1, i1, q1, train_X, train_y_qa, train_y_em, _ = read_dir_sk(args.data)
-        POS_feature_convert(train_X)
+        s1, i1, q1, train_X, train_X_pos, train_y_qa, train_y_em, _ = read_dir_sk(args.data)
 
-        # y_qa, le_qa = encode_labels(y_qa)
-        # y_em, le_em = encode_labels(y_em)
+        train_y_qa, le_qa = encode_labels(train_y_qa)
+        train_y_em, le_em = encode_labels(train_y_em)
+
+        #print POS_feature_convertor(train_X_pos[0])
+        # pos_vectorizer = TfidfVectorizer(preprocessor=pass_input, tokenizer=POS_feature_convertor, ngram_range=(1, 2))
+        # print pos_vectorizer.fit_transform(train_X_pos).toarray().shape
+
+
+        print("--- Q/A ---")
+        qa_grid_search, qa_pipe, qa_params = POS_svm_pipeline(train_X_pos, train_y_qa)
+        report_grid_search(qa_grid_search, qa_pipe, qa_params)
+        best_qa_clf = qa_grid_search.best_estimator_
+
+        print
+        print("--- E/M ---")
+        em_grid_search, em_pipe, em_params = POS_svm_pipeline(train_X_pos, train_y_em)
+        report_grid_search(em_grid_search, em_pipe, em_params)
+        best_em_clf = em_grid_search.best_estimator_
+
+
+
+
 
         # print("--- Q/A ---")
         # qa_grid_search, qa_pipe, qa_params = tfidf_mnb_pipeline(X, y_qa)
