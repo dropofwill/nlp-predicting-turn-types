@@ -81,3 +81,18 @@ When we used the default cross validation scheme, which randomly mixes the data 
 This tells us that the bag of words features weren't generalizing well enough (as expected) across domains (the various images). So we had to find some less content specific features.
 
 At the end of the file 5 the subject begins their answer by repeating the question, so our algorithm mistakingly reports that as a question.
+
+## Grid Search Performance Notes
+
+Char Only NGrams
+(3 character, 1 max_df, l2 norm, False use_idf): 69.8%
+
+Word Only NGrams
+(1 word, 0.75 max_df, l1 norm, False use_idf): 69.1%
+
+Char Only NGrams
+(within word boundaries) (2 character, 0.5 max_df, l1 norm, False use_idf): 69.1%
+
+POS Only NGrams
+
+Mixed NGrams (NN)
