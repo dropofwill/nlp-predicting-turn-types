@@ -13,7 +13,7 @@ or
 When a test directory is given it produces duplicates of those files, except
 this time with it's own predictions for the Q/A and E/M tasks.
 
-Otherwise it prints to the terminal information about it's performance.
+Otherwise it prints to the terminal information about its CV performance.
 """
 
 import os, re, sys, csv, argparse, logging, nltk
@@ -28,7 +28,7 @@ from sklearn import base
 from sklearn.preprocessing import LabelEncoder
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer, TfidfTransformer
 from sklearn.feature_extraction import DictVectorizer
-from sklearn.feature_selection import SelectKBest, chi2
+from sklearn.feature_selection import SelectKBest, SelectPercentile, chi2, f_classif
 
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.tree import DecisionTreeClassifier
@@ -149,6 +149,84 @@ class POSTransformer():
             Xt.append(newtext)
         return Xt
 
+class TrigramPOSTransformer():
+    """
+    Create all possible trigram POS/Token instantiation levels (2^3 = 8 states)
+    Trigram possible states:
+    0 0 0
+    0 1 0
+    0 0 1
+    0 1 1
+    1 0 0
+    1 1 0
+    1 0 1
+    1 1 1
+    """
+    def __init__(self):
+        self.possible_states = [
+            [0, 0, 0],
+            [0, 1, 0],
+            [0, 0, 1],
+            [0, 1, 1],
+            [1, 0, 0],
+            [1, 1, 0],
+            [1, 0, 1],
+            [1, 1, 1]
+        ]
+
+    def transform(self, X):
+        return self.pos_features(X)
+
+    def fit(self, X, y=None):
+        return self
+
+    def get_params(self, deep=True):
+        return {}
+
+    def set_params(self, **parameters):
+        for parameter, value in parameters.items():
+            setattr(self, parameter, value)
+
+    def _trigrams(self, tokens):
+        """
+        Turn tokens into a list of trigrams
+        """
+        min_n, max_n = 3, 3
+        if max_n != 1:
+            original_tokens = tokens
+            tokens = []
+            n_original_tokens = len(original_tokens)
+            for n in xrange(min_n,
+                            min(max_n + 1, n_original_tokens + 1)):
+                for i in xrange(n_original_tokens - n + 1):
+                    tokens.append(original_tokens[i: i + n])
+        return tokens
+
+    def _filter_trigrams(self, trigrams):
+        """
+        Retrieve every possible combination of token/pos trigrams (8 each)
+        """
+        new_trigrams = []
+
+        for trigram in trigrams:
+            for state in self.possible_states:
+                new_tri = []
+
+                for i, state in enumerate(state):
+                    new_tri.append(trigram[i][state])
+
+                new_trigrams.append(" ".join(new_tri))
+        return new_trigrams
+
+    def pos_features(self, pos_tag):
+        newtext, Xt = [], []
+
+        for utterance in pos_tag:
+            trigrams = self._trigrams(utterance)
+            trigrams = self._filter_trigrams(trigrams)
+            Xt.append(trigrams)
+        return Xt
+
 class QATransformer():
     """
     A stateless transformer that wraps the q_features method
@@ -260,50 +338,6 @@ def POS_feature_convertor(pos_tag, tokens_to_replace=['VB']):
                 newtext.append(word)
     return newtext
 
-def POS_svm_pipeline(data, targets, num_images=11):
-    """
-    A simple pipeline using POS as features, support vector machine, and KFold
-    cross validation such that on each run one image file is left out (set
-    num_images differently if working on a smaller training set)
-    Returns the grid_search results, pipeline, and parameters used
-    """
-    pipe = Pipeline([
-        ("preprocess", POSTransformer()),
-        ("vect", TfidfVectorizer(preprocessor=pass_input, tokenizer=pass_input)),
-        #("clf", svm.LinearSVC())
-        ("clf", MultinomialNB())
-    ])
-
-    #pipe = Pipeline([
-        #("vect", TfidfVectorizer(preprocessor=pass_input,tokenizer=POS_feature_convertor)),
-        #("clf", svm.LinearSVC())
-        ##("clf", MultinomialNB())
-    #])
-
-    params = {
-        "preprocess__tokens_to_replace": (["NN"], ["VB", "VBZ"], ["JJ"]),
-        "preprocess__no_replace": (["sp", "{sl}", "{ls}", "{cg}", "{ns}", "{br}", "uh", "um", "hm", "mm"], []),
-        #"vect__use_idf": (True, False),
-        # "vect__sublinear_tf": (True, False),
-        # "vect__smooth_idf": (True, False),
-        "vect__ngram_range": ((1, 1), (1, 2), (1, 3))
-        # "vect__norm": ("l1", "l2")
-        # "vect__stop_words": ("english", None)
-        # "clf__C": (0.1, 0.0, 1.0, 10.0),
-        # "clf__loss": ("l1", "l2"),
-        # "clf__penalty": ("l1", "l2"),
-        # "clf__dual": (True, False),
-        # "clf__tol": (1, 1e-1, 1e-2, 1e-3, 1e-4),
-        # "clf__fit_intercept": (True, False),
-    }
-
-    cv = KFold(len(targets), num_images)
-
-    grid_search = grid_search_pipeline(pipe, params, cv, data, targets)
-
-    return grid_search, pipe, params
-
-
 def encode_labels(y, le=None):
     """
     Takes a list of labels and converts them to numpy compatible classes
@@ -327,7 +361,7 @@ def grid_search_pipeline(pipe, params, cv, data, targets):
     Returns the results
     """
 
-    grid_search = GridSearchCV(pipe, params, cv=cv, verbose=1, n_jobs=1)
+    grid_search = GridSearchCV(pipe, params, cv=cv, verbose=1, n_jobs=3)
 
     print("Performing grid search...")
     #print("pipe:", [name for name, _ in pipe.steps])
@@ -339,6 +373,136 @@ def grid_search_pipeline(pipe, params, cv, data, targets):
     print("done in %0.3fs" % (time() - t0))
 
     return grid_search
+
+def POS_svm_pipeline(data, targets, num_images=11):
+    """
+    A simple pipeline using POS as features, support vector machine, and KFold
+    cross validation such that on each run one image file is left out (set
+    num_images differently if working on a smaller training set)
+    Returns the grid_search results, pipeline, and parameters used
+    """
+
+    pipe = Pipeline([
+        ("features", FeatureUnion([
+            ("nn_pipe", Pipeline([
+                ("nn_preprocess", POSTransformer(
+                    tokens_to_replace=["NN", "NNS", "NNP", "NNPS"],)),
+                ("nn_vect", TfidfVectorizer(   preprocessor=pass_input,
+                                               tokenizer=pass_input,
+                                               # From previous CV runs:
+                                               use_idf=True,
+                                               sublinear_tf=True,
+                                               smooth_idf=True))
+            ])),
+
+            ("cc_pipe", Pipeline([
+                ("cc_preprocess", POSTransformer(
+                    tokens_to_replace=["CD", "CC", "LS"])),
+                ("cc_vect", TfidfVectorizer(   preprocessor=pass_input,
+                                               tokenizer=pass_input,
+                                               use_idf=True,
+                                               sublinear_tf=True,
+                                               smooth_idf=True))
+            ])),
+
+            ("jj_pipe", Pipeline([
+                ("jj_preprocess", POSTransformer(
+                    tokens_to_replace=["JJ", "JJR", "JJS"])),
+                ("jj_vect", TfidfVectorizer(   preprocessor=pass_input,
+                                               tokenizer=pass_input,
+                                               use_idf=True,
+                                               sublinear_tf=True,
+                                               smooth_idf=True))
+            ])),
+        ])),
+        ("selection", SelectKBest(f_classif, k=2000)),
+        #("clf", svm.LinearSVC())
+        ("clf", svm.SVC())
+        #("clf", MultinomialNB())
+    ])
+
+    pipe = Pipeline([
+        ("preprocess", POSTransformer()),
+        ("vect", TfidfVectorizer(   preprocessor=pass_input,
+                                    tokenizer=pass_input,
+                                    # From previous CV runs:
+                                    use_idf=True,
+                                    sublinear_tf=True,
+                                    smooth_idf=True)),
+        #("selection", SelectKBest(f_classif, k=1000)),
+        # Performed better than SelectKBest in the 25-75 percentile range
+        ("selection", SelectPercentile(f_classif)),
+        ("clf", svm.LinearSVC())
+        #("clf", svm.SVC())
+        #("clf", MultinomialNB())
+    ])
+
+    pipe = Pipeline([
+        ("preprocess", TrigramPOSTransformer()),
+        #("vect", CountVectorizer(   preprocessor=pass_input,
+                                    #tokenizer=pass_input,
+                                    #ngram_range=(3,3))),
+        ("vect", CountVectorizer(analyzer=pass_input)),
+        #("selection", SelectKBest(f_classif, k=1000)),
+        # Performed better than SelectKBest in the 25-75 percentile range
+        ("selection", SelectPercentile(f_classif)),
+        ("clf", svm.LinearSVC(loss="l2"))
+        #("clf", svm.SVC())
+        #("clf", MultinomialNB())
+    ])
+
+
+    params = {
+        #"preprocess__tokens_to_replace": (
+            #["NN", "NNS"],
+            #["NNP", "NNPS"],
+            #["JJ", "JJR", "JJS"],
+            #["RB", "RBR", "RBS"],
+            #["CD", "LS"],
+            #["PRP", "PRP$"],
+            #["CC"],
+            #["CD", "CC", "LS", "NNP", "NNPS", "NN", "NNS", "JJ", "JJR", "JJS"],
+            #["CD", "CC", "LS"],
+            #["NN", "NNS", "NNP", "NNPS"]
+            #["VB", "VBD", "VBG", "VBN", "VBP", "VBZ"],
+            # All tags:
+            #["CC", "CD", "DT", "EX", "FW", "IN", "JJ", "JJR", "JJS", "LS", "MD", "NN", "NNS", "NNP", "NNPS", "PDT", "POS", "PRP", "PRP$", "RB", "RBR", "RBS", "RP", "SYM", "TO", "UH", "VB", "VBD", "VBG", "VBN", "VBP", "VBZ", "WDT", "WP", "WP$", "WRB"]
+        #),
+        #"preprocess__no_replace": (["sp", "{sl}", "{ls}", "{cg}", "{ns}", "{br}", "uh", "um", "hm", "mm"], []),
+        # Small effect, slightly better w/tfidf
+        #"vect__use_idf": (True, False),
+        # Small effect, slightly better w/sublinear
+        #"vect__sublinear_tf": (True, False),
+        # Small effect, slightly better Std w/smoothing
+        #"vect__smooth_idf": (True, False),
+        #"vect__ngram_range": (
+            #(1, 1),
+            #(1, 2),
+            #(1, 3),
+            #(2, 2),
+            #(2, 3),
+            #(3, 3),
+            #(2, 4),
+            #(3, 4),
+            #(4, 4)
+        #),
+        # "vect__norm": ("l1", "l2")
+        # "vect__stop_words": ("english", None)
+        #"selection__k": (1500, 2000, "all")
+        "selection__percentile": (25, 50, 75),
+        "clf__C": (0.1, 1.0, 10.0),
+        #"clf__loss": ("l1", "l2"),
+        #"clf__penalty": ("l1", "l2"),
+        #"clf__dual": (True, False),
+        "clf__tol": (1, 1e-1, 1e-2, 1e-3, 1e-4),
+        #"clf__fit_intercept": (True, False),
+        #"clf__kernel": ("linear", "poly", "rbf")
+    }
+
+    cv = KFold(len(targets), num_images)
+    grid_search = grid_search_pipeline(pipe, params, cv, data, targets)
+    return grid_search, pipe, params
+
 
 def qa_mnb_pipeline(data, targets, num_images=11):
     """
@@ -389,13 +553,24 @@ def tfidf_mnb_pipeline(data, targets, num_images=11):
     ])
 
     params = {
-        # "vect__max_df": (0.5, 0.75, 1.0),
+        "vect__max_df": (0.5, 0.75, 1.0),
         # "vect__max_features": (None, 5000, 10000, 50000),
         "vect__use_idf": (True, False),
-        "vect__analyzer": ("word", "char"),
-        "vect__ngram_range": ((1, 2), (1, 3), (1, 1)),
+        "vect__analyzer": (
+            "word",
+            "char_wb"
+            #"char"
+            ),
+        "vect__ngram_range": (
+            (1, 1),
+            (1, 2),
+            (2, 2),
+            (1, 3),
+            (2, 3),
+            (3, 3)
+        ),
         "vect__norm": ("l1", "l2"),
-        "clf__alpha": (0.001, 0.00001, 0.000001)
+        "clf__alpha": (1, 0.1, 0.001, 0.00001, 0.000001)
     }
 
     cv = KFold(len(targets), num_images)
@@ -416,7 +591,7 @@ def report_grid_search(grid_search, pipe, params):
     report_grid_scores(grid_search.grid_scores_)
 
 
-def report_grid_scores(grid_scores, n_top=10):
+def report_grid_scores(grid_scores, n_top=20):
     """
     Helper function to report score performance of the top n classifier / params
     """
@@ -522,10 +697,10 @@ def main(args):
         #best_qa_clf = qa_grid_search.best_estimator_
 
         # Will's MNB Syntax Rules > Ngrams pipeline
-        qa_grid_search, qa_pipe, qa_params = qa_mnb_pipeline(train_X,
-                                                            train_y_qa,
-                                                            len_img_train)
-        report_grid_search(qa_grid_search, qa_pipe, qa_params)
+        #qa_grid_search, qa_pipe, qa_params = qa_mnb_pipeline(train_X,
+                                                            #train_y_qa,
+                                                            #len_img_train)
+        #report_grid_search(qa_grid_search, qa_pipe, qa_params)
 
         # Basic TFIDF feature set of Ngrams
         #qa_grid_search, qa_pipe, qa_params = tfidf_mnb_pipeline(train_X, train_y_qa)
@@ -541,7 +716,7 @@ def main(args):
         best_em_clf = em_grid_search.best_estimator_
 
         # Basic TFIDF feature set of Ngrams
-        #em_grid_search, em_pipe, em_params = tfidf_mnb_pipeline(X, y_em)
+        #em_grid_search, em_pipe, em_params = tfidf_mnb_pipeline(train_X, train_y_em)
         #report_grid_search(em_grid_search, em_pipe, em_params)
         #best_em_clf = em_grid_search.best_estimator_
 
@@ -603,7 +778,9 @@ def main(args):
 
         print
         print("--- E/M ---")
-        em_grid_search, em_pipe, em_params = POS_svm_pipeline(train_X_pos, train_y_em, len_img_train)
+        em_grid_search, em_pipe, em_params = POS_svm_pipeline(  train_X_pos,
+                                                                train_y_em,
+                                                                len_img_train)
 
         #em_grid_search, em_pipe, em_params = tfidf_mnb_pipeline(train_X,
                                                                 #train_y_em,
