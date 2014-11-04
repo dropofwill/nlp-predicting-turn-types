@@ -425,10 +425,10 @@ def POS_svm_pipeline(data, targets, num_images=11):
     #linear_svc = svm.LinearSVC(loss="l2")
 
     #pipe = Pipeline([
-        #("preprocess", TrigramPOSTransformer()),
-        ##("vect", CountVectorizer(   preprocessor=pass_input,
-                                    ##tokenizer=pass_input,
-                                    ##ngram_range=(3,3))),
+        #("trigrams", Pipeline([
+            #("preprocess", TrigramPOSTransformer()),
+            #("vect", CountVectorizer(analyzer=pass_input)),
+        #]))
         #("vect", CountVectorizer(analyzer=pass_input)),
         ##("selection", SelectKBest(f_classif, k=1000)),
         ## Performed better than SelectKBest in the 25-75 percentile range
@@ -439,6 +439,9 @@ def POS_svm_pipeline(data, targets, num_images=11):
         ##("decompose", FactorAnalysis()),
         ##("clf", svm.LinearSVC(loss="l2"))
         ##("clf", svm.SVC())
+        #("transform", DenseTransformer()),
+        #("clf", GaussianNB())
+        #("clf", BernoulliNB())
         #("clf", MultinomialNB())
     #])
 
@@ -466,26 +469,16 @@ def POS_svm_pipeline(data, targets, num_images=11):
                                                smooth_idf=True,
                                                ngram_range=(2,2)))
             ])),
-            #("trigrams", Pipeline([
-                #("preprocess", TrigramPOSTransformer()),
-                #("vect", CountVectorizer(analyzer=pass_input)),
-            #]))
         ],
             transformer_weights={"nn_pipe": 2, "jj_pipe": 1}
         )),
         ("selection", SelectPercentile(f_classif)),
 
         ("feature_selection", svm.LinearSVC(
-            loss="l1", dual=True, C=0.1,
-            fit_intercept=True, random_state=42)),
-
-        #("transform", DenseTransformer()),
-        #("clf", GaussianNB())
-
-        #("clf", BernoulliNB())
-        ("clf", MultinomialNB())
+            loss="l1", dual=True, C=0.1, fit_intercept=True,
+            intercept_scaling=0.1, random_state=42)),
+        ("clf", MultinomialNB(alpha=0.1))
     ])
-
 
     params = {
         #"preprocess__tokens_to_replace": (
@@ -517,9 +510,9 @@ def POS_svm_pipeline(data, targets, num_images=11):
         #"selection__k": (1500, 2000, "all")
         "selection__percentile": (90, 95, 99),
         #"decompose__n_components": (100, 200, None)
-        "clf__alpha": (0.1, 0.01, 0.00001),
+        #"clf__alpha": (0.1, 0.01, 0.00001),
         #"feature_selection__C": (0.1, 1.0, 10.0),
-        "feature_selection__intercept_scaling": (1, 0.1, 1.5),
+        #"feature_selection__intercept_scaling": (1, 0.1, 1.5),
         "feature_selection__tol": (1e-1, 1e-2, 1e-4),
         #"clf__C": (0.1, 1.0, 10.0),
         #"clf__loss": ("l1", "l2"),
@@ -548,7 +541,7 @@ def qa_mnb_pipeline(data, targets, num_images=11):
             ("tfidf", TfidfVectorizer(stop_words="english"))
         ],
         # Weight the syntax rules more heavily then the ngrams
-        transformer_weights={"qa_pipe": 7, "tfidf": 3}
+        transformer_weights={"qa_pipe": 5, "tfidf": 1}
         )),
         ("selection", SelectKBest()),
         ("clf", MultinomialNB())
@@ -562,7 +555,7 @@ def qa_mnb_pipeline(data, targets, num_images=11):
                                             #{"qa_pipe": 0.75, "tfidf": 0.25}),
         # Chain pipeline methods with double underscores
         #"features__qa_pipe__qa_trans__end": (1, 2, 3),
-        "selection__k": (10, 100, 500, "all")
+        "selection__k": (100, 500, "all")
     }
 
     cv = KFold(len(targets), num_images)
@@ -726,16 +719,16 @@ def main(args):
         #report_grid_search(qa_grid_search, qa_pipe, qa_params)
         #best_qa_clf = qa_grid_search.best_estimator_
 
-        # Will's MNB Syntax Rules > Ngrams pipeline
-        #qa_grid_search, qa_pipe, qa_params = qa_mnb_pipeline(train_X,
-                                                            #train_y_qa,
-                                                            #len_img_train)
-        #report_grid_search(qa_grid_search, qa_pipe, qa_params)
-
         # Basic TFIDF feature set of Ngrams
         #qa_grid_search, qa_pipe, qa_params = tfidf_mnb_pipeline(train_X, train_y_qa)
         #report_grid_search(qa_grid_search, qa_pipe, qa_params)
         #best_qa_clf = qa_grid_search.best_estimator_
+
+        # Will's MNB Syntax Rules > Ngrams pipeline
+        qa_grid_search, qa_pipe, qa_params = qa_mnb_pipeline(train_X,
+                                                            train_y_qa,
+                                                            len_img_train)
+        report_grid_search(qa_grid_search, qa_pipe, qa_params)
 
         print
         print("--- E/M ---")
