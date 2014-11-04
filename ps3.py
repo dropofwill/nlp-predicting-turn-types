@@ -28,9 +28,12 @@ from sklearn import base
 from sklearn.preprocessing import LabelEncoder
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer, TfidfTransformer
 from sklearn.feature_extraction import DictVectorizer
-from sklearn.feature_selection import SelectKBest, SelectPercentile, chi2, f_classif
+from sklearn.feature_selection import SelectKBest, SelectPercentile, VarianceThreshold, chi2, f_classif, RFE
+from sklearn.decomposition import RandomizedPCA, SparsePCA, TruncatedSVD, FactorAnalysis
+from sklearn.linear_model import RandomizedLasso
 
-from sklearn.naive_bayes import MultinomialNB
+from sklearn.naive_bayes import MultinomialNB, GaussianNB, BernoulliNB
+from sklearn.neighbors import KNeighborsClassifier, RadiusNeighborsClassifier
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.grid_search import GridSearchCV
 from sklearn.pipeline import Pipeline, FeatureUnion
@@ -227,6 +230,24 @@ class TrigramPOSTransformer():
             Xt.append(trigrams)
         return Xt
 
+class DenseTransformer():
+    def __init__(self):
+        pass
+
+    def transform(self, X, y=None):
+        # To dense form
+        return X.toarray()
+
+    def fit(self, X, y=None):
+        return self
+
+    def get_params(self, deep=True):
+        return {}
+
+    def set_params(self, **parameters):
+        for parameter, value in parameters.items():
+            setattr(self, parameter, value)
+
 class QATransformer():
     """
     A stateless transformer that wraps the q_features method
@@ -318,26 +339,6 @@ class QATransformer():
             features.append(per_utterance)
         return features
 
-
-def POS_feature_convertor(pos_tag, tokens_to_replace=['VB']):
-    newtext = []
-    match = False
-
-    # token = text.split()
-    # pos_tag = nltk.pos_tag(token)
-
-    for item in pos_tag:
-        word = item[0]
-        pos = item[1]
-
-        for tag in tokens_to_replace:
-            if pos == tag:
-                newtext.append(pos)
-                match = True
-            else:
-                newtext.append(word)
-    return newtext
-
 def encode_labels(y, le=None):
     """
     Takes a list of labels and converts them to numpy compatible classes
@@ -421,21 +422,7 @@ def POS_svm_pipeline(data, targets, num_images=11):
         #("clf", MultinomialNB())
     ])
 
-    pipe = Pipeline([
-        ("preprocess", POSTransformer()),
-        ("vect", TfidfVectorizer(   preprocessor=pass_input,
-                                    tokenizer=pass_input,
-                                    # From previous CV runs:
-                                    use_idf=True,
-                                    sublinear_tf=True,
-                                    smooth_idf=True)),
-        #("selection", SelectKBest(f_classif, k=1000)),
-        # Performed better than SelectKBest in the 25-75 percentile range
-        ("selection", SelectPercentile(f_classif)),
-        ("clf", svm.LinearSVC())
-        #("clf", svm.SVC())
-        #("clf", MultinomialNB())
-    ])
+    linear_svc = svm.LinearSVC(loss="l2")
 
     pipe = Pipeline([
         ("preprocess", TrigramPOSTransformer()),
@@ -445,10 +432,54 @@ def POS_svm_pipeline(data, targets, num_images=11):
         ("vect", CountVectorizer(analyzer=pass_input)),
         #("selection", SelectKBest(f_classif, k=1000)),
         # Performed better than SelectKBest in the 25-75 percentile range
-        ("selection", SelectPercentile(f_classif)),
-        ("clf", svm.LinearSVC(loss="l2"))
+        #("selection", SelectPercentile(f_classif)),
+        #("selection", VarianceThreshold(threshold=(0.5 * (0.5)))),
+        #("selection", RandomizedLasso()),
+        #("selection", RFE(estimator=linear_svc)),
+        #("decompose", FactorAnalysis()),
+        #("clf", svm.LinearSVC(loss="l2"))
         #("clf", svm.SVC())
-        #("clf", MultinomialNB())
+        ("clf", MultinomialNB())
+    ])
+
+    pipe = Pipeline([
+        ("features", FeatureUnion([
+            ("nn_pipe", Pipeline([
+                ("nn_preprocess", POSTransformer(
+                    tokens_to_replace=["NN", "NNS", "NNP", "NNPS", "CD", "CC", "LS"],)),
+                ("nn_vect", TfidfVectorizer(   preprocessor=pass_input,
+                                               tokenizer=pass_input,
+                                               # From previous CV runs:
+                                               use_idf=True,
+                                               sublinear_tf=True,
+                                               smooth_idf=True,
+                                               ngram_range=(2,2)))
+            ])),
+            ("jj_pipe", Pipeline([
+                ("jj_preprocess", POSTransformer(
+                    tokens_to_replace=["JJ", "JJR", "JJS"],)),
+                ("jj_vect", TfidfVectorizer(   preprocessor=pass_input,
+                                               tokenizer=pass_input,
+                                               # From previous CV runs:
+                                               use_idf=True,
+                                               sublinear_tf=True,
+                                               smooth_idf=True,
+                                               ngram_range=(2,2)))
+            ])),
+            ("trigrams", Pipeline([
+                ("preprocess", TrigramPOSTransformer()),
+                ("vect", CountVectorizer(analyzer=pass_input)),
+            ]))
+        ])),
+        ("selection", SelectPercentile(chi2)),
+
+        ("feature_selection", svm.LinearSVC(loss="l2", C=0.1, fit_intercept=True)),
+        #("transform", DenseTransformer()),
+        #("clf", DecisionTreeClassifier())
+        #("clf", GaussianNB())
+
+        #("clf", BernoulliNB())
+        ("clf", MultinomialNB())
     ])
 
 
@@ -475,26 +506,22 @@ def POS_svm_pipeline(data, targets, num_images=11):
         #"vect__sublinear_tf": (True, False),
         # Small effect, slightly better Std w/smoothing
         #"vect__smooth_idf": (True, False),
-        #"vect__ngram_range": (
-            #(1, 1),
-            #(1, 2),
-            #(1, 3),
-            #(2, 2),
-            #(2, 3),
-            #(3, 3),
-            #(2, 4),
-            #(3, 4),
-            #(4, 4)
+        #"features__nn_pipe__nn_vect__ngram_range": (
+            #(1, 1), (1, 2), (1, 3), (2, 2), (2, 3), (3, 3), (2, 4), (3, 4), (4, 4)
         #),
         # "vect__norm": ("l1", "l2")
         # "vect__stop_words": ("english", None)
         #"selection__k": (1500, 2000, "all")
-        "selection__percentile": (25, 50, 75),
-        "clf__C": (0.1, 1.0, 10.0),
+        "selection__percentile": (50, 75, 90, 95, 99),
+        #"decompose__n_components": (100, 200, None)
+        "clf__alpha": (0.1, 0.01, 0.00001),
+        #"feature_selection__C": (0.1, 1.0, 10.0),
+        "feature_selection__tol": (1, 1e-1, 1e-2),
+        #"clf__C": (0.1, 1.0, 10.0),
         #"clf__loss": ("l1", "l2"),
         #"clf__penalty": ("l1", "l2"),
         #"clf__dual": (True, False),
-        "clf__tol": (1, 1e-1, 1e-2, 1e-3, 1e-4),
+        #"clf__tol": (1, 5e-1, 1e-1, 1e-2),
         #"clf__fit_intercept": (True, False),
         #"clf__kernel": ("linear", "poly", "rbf")
     }
@@ -525,13 +552,13 @@ def qa_mnb_pipeline(data, targets, num_images=11):
     ])
 
     params = {
-        "clf__alpha": (1, 0.1, 0.001, 0.00001, 0.000001),
+        "clf__alpha": (1, 0.1, 0.001, 0.001, 0.00001, 0.000001),
         # Claims that FeatureUnion has no attr transformer weights
         #"features__transformer_weights": (  None,
                                             #{"qa_pipe": 0.25, "tfidf": 0.75},
                                             #{"qa_pipe": 0.75, "tfidf": 0.25}),
         # Chain pipeline methods with double underscores
-        "features__qa_pipe__qa_trans__end": (1, 2, 3),
+        #"features__qa_pipe__qa_trans__end": (1, 2, 3),
         "selection__k": (10, 100, 500, "all")
     }
 
