@@ -90,9 +90,14 @@ Char Only NGrams
 Word Only NGrams
 (1 word, 0.75 max_df, l1 norm, False use_idf): 69.1%
 
-Char Only NGrams
-(within word boundaries) (2 character, 0.5 max_df, l1 norm, False use_idf): 69.1%
+Char Only NGrams (within word boundaries)
+(2 character, 0.5 max_df, l1 norm, False use_idf): 69.1%
 
 POS Only NGrams
+(3 POS tags): 71.1%
 
-Mixed NGrams (NN)
+Mixed NGrams
+(Common Nouns)
+(Proper Nouns)
+(Adjectives)
+(Adverbs)
