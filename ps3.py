@@ -383,6 +383,65 @@ def POS_svm_pipeline(data, targets, num_images=11):
     Returns the grid_search results, pipeline, and parameters used
     """
 
+    #pipe = Pipeline([
+        #("features", FeatureUnion([
+            #("nn_pipe", Pipeline([
+                #("nn_preprocess", POSTransformer(
+                    #tokens_to_replace=["NN", "NNS", "NNP", "NNPS"],)),
+                #("nn_vect", TfidfVectorizer(   preprocessor=pass_input,
+                                               #tokenizer=pass_input,
+                                               ## From previous CV runs:
+                                               #use_idf=True,
+                                               #sublinear_tf=True,
+                                               #smooth_idf=True))
+            #])),
+
+            #("cc_pipe", Pipeline([
+                #("cc_preprocess", POSTransformer(
+                    #tokens_to_replace=["CD", "CC", "LS"])),
+                #("cc_vect", TfidfVectorizer(   preprocessor=pass_input,
+                                               #tokenizer=pass_input,
+                                               #use_idf=True,
+                                               #sublinear_tf=True,
+                                               #smooth_idf=True))
+            #])),
+
+            #("jj_pipe", Pipeline([
+                #("jj_preprocess", POSTransformer(
+                    #tokens_to_replace=["JJ", "JJR", "JJS"])),
+                #("jj_vect", TfidfVectorizer(   preprocessor=pass_input,
+                                               #tokenizer=pass_input,
+                                               #use_idf=True,
+                                               #sublinear_tf=True,
+                                               #smooth_idf=True))
+            #])),
+        #])),
+        #("selection", SelectKBest(f_classif, k=2000)),
+        ##("clf", svm.LinearSVC())
+        #("clf", svm.SVC())
+        ##("clf", MultinomialNB())
+    #])
+
+    #linear_svc = svm.LinearSVC(loss="l2")
+
+    #pipe = Pipeline([
+        #("preprocess", TrigramPOSTransformer()),
+        ##("vect", CountVectorizer(   preprocessor=pass_input,
+                                    ##tokenizer=pass_input,
+                                    ##ngram_range=(3,3))),
+        #("vect", CountVectorizer(analyzer=pass_input)),
+        ##("selection", SelectKBest(f_classif, k=1000)),
+        ## Performed better than SelectKBest in the 25-75 percentile range
+        ##("selection", SelectPercentile(f_classif)),
+        ##("selection", VarianceThreshold(threshold=(0.5 * (0.5)))),
+        ##("selection", RandomizedLasso()),
+        ##("selection", RFE(estimator=linear_svc)),
+        ##("decompose", FactorAnalysis()),
+        ##("clf", svm.LinearSVC(loss="l2"))
+        ##("clf", svm.SVC())
+        #("clf", MultinomialNB())
+    #])
+
     pipe = Pipeline([
         ("features", FeatureUnion([
             ("nn_pipe", Pipeline([
@@ -393,71 +452,12 @@ def POS_svm_pipeline(data, targets, num_images=11):
                                                # From previous CV runs:
                                                use_idf=True,
                                                sublinear_tf=True,
-                                               smooth_idf=True))
-            ])),
-
-            ("cc_pipe", Pipeline([
-                ("cc_preprocess", POSTransformer(
-                    tokens_to_replace=["CD", "CC", "LS"])),
-                ("cc_vect", TfidfVectorizer(   preprocessor=pass_input,
-                                               tokenizer=pass_input,
-                                               use_idf=True,
-                                               sublinear_tf=True,
-                                               smooth_idf=True))
-            ])),
-
-            ("jj_pipe", Pipeline([
-                ("jj_preprocess", POSTransformer(
-                    tokens_to_replace=["JJ", "JJR", "JJS"])),
-                ("jj_vect", TfidfVectorizer(   preprocessor=pass_input,
-                                               tokenizer=pass_input,
-                                               use_idf=True,
-                                               sublinear_tf=True,
-                                               smooth_idf=True))
-            ])),
-        ])),
-        ("selection", SelectKBest(f_classif, k=2000)),
-        #("clf", svm.LinearSVC())
-        ("clf", svm.SVC())
-        #("clf", MultinomialNB())
-    ])
-
-    linear_svc = svm.LinearSVC(loss="l2")
-
-    pipe = Pipeline([
-        ("preprocess", TrigramPOSTransformer()),
-        #("vect", CountVectorizer(   preprocessor=pass_input,
-                                    #tokenizer=pass_input,
-                                    #ngram_range=(3,3))),
-        ("vect", CountVectorizer(analyzer=pass_input)),
-        #("selection", SelectKBest(f_classif, k=1000)),
-        # Performed better than SelectKBest in the 25-75 percentile range
-        #("selection", SelectPercentile(f_classif)),
-        #("selection", VarianceThreshold(threshold=(0.5 * (0.5)))),
-        #("selection", RandomizedLasso()),
-        #("selection", RFE(estimator=linear_svc)),
-        #("decompose", FactorAnalysis()),
-        #("clf", svm.LinearSVC(loss="l2"))
-        #("clf", svm.SVC())
-        ("clf", MultinomialNB())
-    ])
-
-    pipe = Pipeline([
-        ("features", FeatureUnion([
-            ("nn_pipe", Pipeline([
-                ("nn_preprocess", POSTransformer(
-                    tokens_to_replace=["NN", "NNS", "NNP", "NNPS", "CD", "CC", "LS"],)),
-                ("nn_vect", TfidfVectorizer(   preprocessor=pass_input,
-                                               tokenizer=pass_input,
-                                               # From previous CV runs:
-                                               use_idf=True,
-                                               sublinear_tf=True,
                                                smooth_idf=True,
                                                ngram_range=(2,2)))
             ])),
             ("jj_pipe", Pipeline([
                 ("jj_preprocess", POSTransformer(
-                    tokens_to_replace=["JJ", "JJR", "JJS"],)),
+                    tokens_to_replace=["JJ", "JJR", "JJS", "RB", "RBR", "RBS"],)),
                 ("jj_vect", TfidfVectorizer(   preprocessor=pass_input,
                                                tokenizer=pass_input,
                                                # From previous CV runs:
@@ -466,16 +466,20 @@ def POS_svm_pipeline(data, targets, num_images=11):
                                                smooth_idf=True,
                                                ngram_range=(2,2)))
             ])),
-            ("trigrams", Pipeline([
-                ("preprocess", TrigramPOSTransformer()),
-                ("vect", CountVectorizer(analyzer=pass_input)),
-            ]))
-        ])),
-        ("selection", SelectPercentile(chi2)),
+            #("trigrams", Pipeline([
+                #("preprocess", TrigramPOSTransformer()),
+                #("vect", CountVectorizer(analyzer=pass_input)),
+            #]))
+        ],
+            transformer_weights={"nn_pipe": 2, "jj_pipe": 1}
+        )),
+        ("selection", SelectPercentile(f_classif)),
 
-        ("feature_selection", svm.LinearSVC(loss="l2", C=0.1, fit_intercept=True)),
+        ("feature_selection", svm.LinearSVC(
+            loss="l1", dual=True, C=0.1,
+            fit_intercept=True, random_state=42)),
+
         #("transform", DenseTransformer()),
-        #("clf", DecisionTreeClassifier())
         #("clf", GaussianNB())
 
         #("clf", BernoulliNB())
@@ -487,8 +491,7 @@ def POS_svm_pipeline(data, targets, num_images=11):
         #"preprocess__tokens_to_replace": (
             #["NN", "NNS"],
             #["NNP", "NNPS"],
-            #["JJ", "JJR", "JJS"],
-            #["RB", "RBR", "RBS"],
+            #["JJ", "JJR", "JJS", "RB", "RBR", "RBS"],
             #["CD", "LS"],
             #["PRP", "PRP$"],
             #["CC"],
@@ -512,16 +515,16 @@ def POS_svm_pipeline(data, targets, num_images=11):
         # "vect__norm": ("l1", "l2")
         # "vect__stop_words": ("english", None)
         #"selection__k": (1500, 2000, "all")
-        "selection__percentile": (50, 75, 90, 95, 99),
+        "selection__percentile": (90, 95, 99),
         #"decompose__n_components": (100, 200, None)
         "clf__alpha": (0.1, 0.01, 0.00001),
         #"feature_selection__C": (0.1, 1.0, 10.0),
-        "feature_selection__tol": (1, 1e-1, 1e-2),
+        "feature_selection__intercept_scaling": (1, 0.1, 1.5),
+        "feature_selection__tol": (1e-1, 1e-2, 1e-4),
         #"clf__C": (0.1, 1.0, 10.0),
         #"clf__loss": ("l1", "l2"),
         #"clf__penalty": ("l1", "l2"),
         #"clf__dual": (True, False),
-        #"clf__tol": (1, 5e-1, 1e-1, 1e-2),
         #"clf__fit_intercept": (True, False),
         #"clf__kernel": ("linear", "poly", "rbf")
     }
