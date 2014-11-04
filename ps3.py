@@ -108,8 +108,11 @@ class POSTransformer():
         used instead of the token for ngrams
     """
 
-    def __init__(self, tokens_to_replace=["NN"]):
+    def __init__(self,
+                tokens_to_replace=["NN"],
+                no_replace=[]):
         self.tokens_to_replace = tokens_to_replace
+        self.no_replace = no_replace
 
     def transform(self, X):
         return self.pos_features(X)
@@ -118,16 +121,15 @@ class POSTransformer():
         return self
 
     def get_params(self, deep=True):
-        return {"tokens_to_replace": self.tokens_to_replace}
+        return {"tokens_to_replace": self.tokens_to_replace,
+                "no_replace": self.no_replace}
 
     def set_params(self, **parameters):
         for parameter, value in parameters.items():
             setattr(self, parameter, value)
 
     def pos_features(self, pos_tag):
-        newtext = []
-        Xt = []
-        match = False
+        newtext, Xt = [], []
 
         for utterance in pos_tag:
             newtext = []
@@ -138,8 +140,10 @@ class POSTransformer():
 
                 for tag in self.tokens_to_replace:
                     if pos == tag:
-                        newtext.append(pos)
-                        match = True
+                        if word not in self.no_replace:
+                            newtext.append(pos)
+                        else:
+                            newtext.append(word)
                     else:
                         newtext.append(word)
             Xt.append(newtext)
@@ -237,7 +241,7 @@ class QATransformer():
         return features
 
 
-def POS_feature_convertor(pos_tag, tags_to_replace=['VB']):
+def POS_feature_convertor(pos_tag, tokens_to_replace=['VB']):
     newtext = []
     match = False
 
@@ -248,7 +252,7 @@ def POS_feature_convertor(pos_tag, tags_to_replace=['VB']):
         word = item[0]
         pos = item[1]
 
-        for tag in tags_to_replace:
+        for tag in tokens_to_replace:
             if pos == tag:
                 newtext.append(pos)
                 match = True
@@ -277,7 +281,8 @@ def POS_svm_pipeline(data, targets, num_images=11):
     #])
 
     params = {
-        "preprocess": (["NN"], ["VB", "VBZ"], ["JJ"]),
+        "preprocess__tokens_to_replace": (["NN"], ["VB", "VBZ"], ["JJ"]),
+        "preprocess__no_replace": (["sp", "{sl}", "{ls}", "{cg}", "{ns}", "{br}", "uh", "um", "hm", "mm"], []),
         #"vect__use_idf": (True, False),
         # "vect__sublinear_tf": (True, False),
         # "vect__smooth_idf": (True, False),
@@ -517,10 +522,10 @@ def main(args):
         #best_qa_clf = qa_grid_search.best_estimator_
 
         # Will's MNB Syntax Rules > Ngrams pipeline
-        #qa_grid_search, qa_pipe, qa_params = qa_mnb_pipeline(train_X,
-                                                            #train_y_qa,
-                                                            #len_img_train)
-        #report_grid_search(qa_grid_search, qa_pipe, qa_params)
+        qa_grid_search, qa_pipe, qa_params = qa_mnb_pipeline(train_X,
+                                                            train_y_qa,
+                                                            len_img_train)
+        report_grid_search(qa_grid_search, qa_pipe, qa_params)
 
         # Basic TFIDF feature set of Ngrams
         #qa_grid_search, qa_pipe, qa_params = tfidf_mnb_pipeline(train_X, train_y_qa)
