@@ -189,22 +189,27 @@ def q_features(X, begin=0, end=2):
 
     return features
 
-class QATransformer(base.TransformerMixin):
+class QATransformer():
     """
     A stateless transformer that wraps the q_features method
     for some reason grid serach wants a get_params method...
     """
-    def __init__(self):
-        self.params = {}
+    def __init__(self, begin=0, end=2):
+        self.begin = begin
+        self.end = end
 
-    def transform(self, X, **transform_params):
-        return q_features(X)
+    def transform(self, X):
+        return q_features(X, self.begin, self.end)
 
-    def fit(self, X, y=None, **fit_params):
+    def fit(self, X, y=None):
         return self
 
     def get_params(self, deep):
-        return self.params
+        return {"begin": self.begin, "end": self.end}
+
+    def set_params(self, **parameters):
+        for parameter, value in parameters.items():
+            setattr(self, parameter, value)
 
 
 def POS_feature_convertor(pos_tag, tags_to_replace=['VB']):
@@ -324,7 +329,8 @@ def qa_mnb_pipeline(data, targets, num_images=11):
         #"features__transformer_weights": (  None,
                                             #{"qa_pipe": 0.25, "tfidf": 0.75},
                                             #{"qa_pipe": 0.75, "tfidf": 0.25}),
-        "selection__k": (10, 100, "all")
+        "features__qa_pipe__qa_trans__end": (1, 2, 3),
+        "selection__k": (10, 100, 500, "all")
     }
 
     cv = KFold(len(targets), num_images)
