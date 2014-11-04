@@ -101,119 +101,143 @@ def read_dir_sk(path):
                     qID.append(row[2])
     return sID, iID, qID, X, X_pos, y_qa, y_em, fID
 
-def q_features(X, begin=0, end=2):
+class POSTransformer():
     """
-    Takes a list of raw strings as input
-    Returns a dict of binary features that imply the sentence is a question
+    A stateless transformer that wraps the pos_features method
+    tokens_to_replace takes a list of string representation of tags, which are
+        used instead of the token for ngrams
     """
-    wh_words = [    # Wh-pronouns
-                    "what", "which", "who", "whom",
-                    # Wh-possesive
-                    "whose",
-                    # Wh-adverb
-                    "how", "when", "where", "why",
-                    # Wh-* with 's
-                    "what's", "who's"]
 
-    ans_words = [   # non-speech disfluencies
-                    "sp", "{sl}", "{ls}", "{cg}", "{ns}", "{br}",
-                    # speech disfluencies
-                    "uh", "um", "hm", "mm"
-                    # conjunctions and sentence starter words
-                    "well", "and", "but", "yet"]
+    def __init__(self, tokens_to_replace=["NN"]):
+        self.tokens_to_replace = tokens_to_replace
 
-    aux_verbs = ["am", "is", "are", "was", "were",
-                "have", "had", "has",
-                "do", "does", "did"]
+    def transform(self, X):
+        return self.pos_features(X)
 
-    modal_verbs = ["can", "could",
-                  "may", "might", "must",
-                  "shall", "should",
-                  "will", "would"]
-    features = []
-    text = []
-    for sentence in X:
-        per_utterance = dict()
-        tokens = sentence.split()
-        text.append(tokens)
+    def fit(self, X, y=None):
+        return self
 
-        for i in range(begin, end + 1):
-            if len(tokens) > i + 1:
-                for wh in wh_words:
-                    if tokens[i] == wh:
-                        per_utterance[wh+"_"+str(i)] = 1
+    def get_params(self, deep=True):
+        return {"tokens_to_replace": self.tokens_to_replace}
 
-                for aux in aux_verbs:
-                    if tokens[i] == aux:
-                        # Only match if the first, non ans_word
-                        if i != begin:
-                            ok = True
-                            for j in range(begin, i):
-                                if tokens[j] not in ans_words:
-                                    ok = False
-                            if ok:
-                                per_utterance[aux+"_"+str(i)] = 1
-                        else:
-                            per_utterance[aux+"_"+str(i)] = 1
+    def set_params(self, **parameters):
+        for parameter, value in parameters.items():
+            setattr(self, parameter, value)
 
-                for modal in modal_verbs:
-                    if tokens[i] == modal:
-                        # Only match if the first, non ans_word
-                        if i != begin:
-                            ok = True
-                            for j in range(begin, i):
-                                if tokens[j] not in ans_words:
-                                    ok = False
-                            if ok:
-                                per_utterance[modal+"_"+str(i)] = 1
-                        else:
-                            per_utterance[modal+"_"+str(i)] = 1
-        features.append(per_utterance)
+    def pos_features(self, pos_tag):
+        newtext = []
+        Xt = []
+        match = False
 
-    #print("Questions?")
-    #for i, item in enumerate(features):
-        #if i % 2 == 0:
-            #print "{0}, {1}".format(i, features[i])
+        for utterance in pos_tag:
+            newtext = []
 
-            #if (len(features[i]) == 0):
-                #print(text[i])
+            for item in utterance:
+                word = item[0]
+                pos = item[1]
 
-    #print("------")
-    #print("Answers")
-    #for i, item in enumerate(features):
-        #if i % 2 != 0:
-            #print "{0}, {1}".format(i, features[i])
-
-            #if (len(features[i]) > 0):
-                #print(text[i])
-
-    return features
+                for tag in self.tokens_to_replace:
+                    if pos == tag:
+                        newtext.append(pos)
+                        match = True
+                    else:
+                        newtext.append(word)
+            Xt.append(newtext)
+        return Xt
 
 class QATransformer():
     """
     A stateless transformer that wraps the q_features method
-    for some reason grid serach wants a get_params method...
     """
     def __init__(self, begin=0, end=2):
         self.begin = begin
         self.end = end
 
     def transform(self, X):
-        return q_features(X, self.begin, self.end)
+        return self.q_features(X, self.begin, self.end)
 
     def fit(self, X, y=None):
         return self
 
-    def get_params(self, deep):
+    def get_params(self, deep=True):
         return {"begin": self.begin, "end": self.end}
 
     def set_params(self, **parameters):
         for parameter, value in parameters.items():
             setattr(self, parameter, value)
 
+    def q_features(self, X, begin=0, end=2):
+        """
+        Takes a list of raw strings as input
+        Returns a dict of binary features that imply the sentence is a question
+        """
+        wh_words = [    # Wh-pronouns
+                        "what", "which", "who", "whom",
+                        # Wh-possesive
+                        "whose",
+                        # Wh-adverb
+                        "how", "when", "where", "why",
+                        # Wh-* with 's
+                        "what's", "who's"]
+
+        ans_words = [   # non-speech disfluencies
+                        "sp", "{sl}", "{ls}", "{cg}", "{ns}", "{br}",
+                        # speech disfluencies
+                        "uh", "um", "hm", "mm"
+                        # conjunctions and sentence starter words
+                        "well", "and", "but", "yet"]
+
+        aux_verbs = ["am", "is", "are", "was", "were",
+                    "have", "had", "has",
+                    "do", "does", "did"]
+
+        modal_verbs = ["can", "could",
+                      "may", "might", "must",
+                      "shall", "should",
+                      "will", "would"]
+        features = []
+        text = []
+        for sentence in X:
+            per_utterance = dict()
+            tokens = sentence.split()
+            text.append(tokens)
+
+            for i in range(begin, end + 1):
+                if len(tokens) > i + 1:
+                    for wh in wh_words:
+                        if tokens[i] == wh:
+                            per_utterance[wh+"_"+str(i)] = 1
+
+                    for aux in aux_verbs:
+                        if tokens[i] == aux:
+                            # Only match if the first, non ans_word
+                            if i != begin:
+                                ok = True
+                                for j in range(begin, i):
+                                    if tokens[j] not in ans_words:
+                                        ok = False
+                                if ok:
+                                    per_utterance[aux+"_"+str(i)] = 1
+                            else:
+                                per_utterance[aux+"_"+str(i)] = 1
+
+                    for modal in modal_verbs:
+                        if tokens[i] == modal:
+                            # Only match if the first, non ans_word
+                            if i != begin:
+                                ok = True
+                                for j in range(begin, i):
+                                    if tokens[j] not in ans_words:
+                                        ok = False
+                                if ok:
+                                    per_utterance[modal+"_"+str(i)] = 1
+                            else:
+                                per_utterance[modal+"_"+str(i)] = 1
+            features.append(per_utterance)
+        return features
+
 
 def POS_feature_convertor(pos_tag, tags_to_replace=['VB']):
-
     newtext = []
     match = False
 
@@ -230,7 +254,6 @@ def POS_feature_convertor(pos_tag, tags_to_replace=['VB']):
                 match = True
             else:
                 newtext.append(word)
-
     return newtext
 
 def POS_svm_pipeline(data, targets, num_images=11):
@@ -241,13 +264,21 @@ def POS_svm_pipeline(data, targets, num_images=11):
     Returns the grid_search results, pipeline, and parameters used
     """
     pipe = Pipeline([
-        ("vect", TfidfVectorizer(preprocessor=pass_input,tokenizer=POS_feature_convertor)),
-        ("clf", svm.LinearSVC())
-        #("clf", MultinomialNB())
+        ("preprocess", POSTransformer()),
+        ("vect", TfidfVectorizer(preprocessor=pass_input, tokenizer=pass_input)),
+        #("clf", svm.LinearSVC())
+        ("clf", MultinomialNB())
     ])
 
+    #pipe = Pipeline([
+        #("vect", TfidfVectorizer(preprocessor=pass_input,tokenizer=POS_feature_convertor)),
+        #("clf", svm.LinearSVC())
+        ##("clf", MultinomialNB())
+    #])
+
     params = {
-        "vect__use_idf": (True, False),
+        "preprocess": (["NN"], ["VB", "VBZ"], ["JJ"]),
+        #"vect__use_idf": (True, False),
         # "vect__sublinear_tf": (True, False),
         # "vect__smooth_idf": (True, False),
         "vect__ngram_range": ((1, 1), (1, 2), (1, 3))
@@ -326,9 +357,11 @@ def qa_mnb_pipeline(data, targets, num_images=11):
 
     params = {
         "clf__alpha": (1, 0.1, 0.001, 0.00001, 0.000001),
+        # Claims that FeatureUnion has no attr transformer weights
         #"features__transformer_weights": (  None,
                                             #{"qa_pipe": 0.25, "tfidf": 0.75},
                                             #{"qa_pipe": 0.75, "tfidf": 0.25}),
+        # Chain pipeline methods with double underscores
         "features__qa_pipe__qa_trans__end": (1, 2, 3),
         "selection__k": (10, 100, 500, "all")
     }
@@ -344,6 +377,7 @@ def tfidf_mnb_pipeline(data, targets, num_images=11):
     num_images differently if working on a smaller training set)
     Returns the grid_search results, pipeline, and parameters used
     """
+
     pipe = Pipeline([
         ("vect", TfidfVectorizer(stop_words="english")),
         ("clf", MultinomialNB())
@@ -462,6 +496,7 @@ def pass_input(input):
 
 def main(args):
     if (args.data):
+        print("Performing pos tagging...")
         # Our features and two sets of labels
         s1, i1, q1,             \
         train_X, train_X_pos,   \
@@ -477,9 +512,9 @@ def main(args):
 
         print("--- Q/A ---")
         # Tong's SVM Token/POS pipeline
-        qa_grid_search, qa_pipe, qa_params = POS_svm_pipeline(train_X_pos, train_y_qa)
-        report_grid_search(qa_grid_search, qa_pipe, qa_params)
-        best_qa_clf = qa_grid_search.best_estimator_
+        #qa_grid_search, qa_pipe, qa_params = POS_svm_pipeline(train_X_pos, train_y_qa)
+        #report_grid_search(qa_grid_search, qa_pipe, qa_params)
+        #best_qa_clf = qa_grid_search.best_estimator_
 
         # Will's MNB Syntax Rules > Ngrams pipeline
         #qa_grid_search, qa_pipe, qa_params = qa_mnb_pipeline(train_X,
@@ -494,6 +529,7 @@ def main(args):
 
         print
         print("--- E/M ---")
+        #print(train_X_pos)
         # Tong's SVM Token/POS pipeline
         em_grid_search, em_pipe, em_params = POS_svm_pipeline(train_X_pos, train_y_em)
         report_grid_search(em_grid_search, em_pipe, em_params)
@@ -505,6 +541,8 @@ def main(args):
         #best_em_clf = em_grid_search.best_estimator_
 
     elif (args.test and args.train):
+        print("Performing pos tagging...")
+
         s1, i1, q1,             \
         train_X, train_X_pos,   \
         train_y_qa, train_y_em, _ = read_dir_sk(args.train)
