@@ -1,5 +1,10 @@
-NLP Problem Set 3
+Predicting Turn Types for NLP Problem Set 3
 ===============
+
+Team Members
+Ryan Dennehy
+Tong Liu
+Will Paul
 
 ## TODO
 
