@@ -298,6 +298,7 @@ class QATransformer():
                       "may", "might", "must",
                       "shall", "should",
                       "will", "would"]
+
         features = []
         text = []
         for sentence in X:
@@ -337,6 +338,24 @@ class QATransformer():
                             else:
                                 per_utterance[modal+"_"+str(i)] = 1
             features.append(per_utterance)
+
+        print("Questions?")
+        for i, item in enumerate(features):
+            if i % 2 == 0:
+                print "{0}, {1}".format(i, features[i])
+
+                if (len(features[i]) == 0):
+                    print(text[i])
+
+        print("------")
+        print("Answers")
+        for i, item in enumerate(features):
+            if i % 2 != 0:
+                print "{0}, {1}".format(i, features[i])
+
+                if (len(features[i]) > 0):
+                    print(text[i])
+
         return features
 
 def encode_labels(y, le=None):
@@ -526,11 +545,11 @@ def POS_svm_pipeline(data, targets, num_images=11):
     grid_search = grid_search_pipeline(pipe, params, cv, data, targets)
     return grid_search, pipe, params
 
-
 def qa_mnb_pipeline(data, targets, num_images=11):
     """
     A Q/A specific pipeline
     """
+
     # Combine tfidf ngram and qa dict features and pass to a single clf
     pipe = Pipeline([
         ("features", FeatureUnion([
@@ -540,10 +559,12 @@ def qa_mnb_pipeline(data, targets, num_images=11):
             ])),
             ("tfidf", TfidfVectorizer(stop_words="english"))
         ],
-        # Weight the syntax rules more heavily then the ngrams
+        ## Weight the syntax rules more heavily then the ngrams
         transformer_weights={"qa_pipe": 5, "tfidf": 1}
         )),
-        ("selection", SelectKBest()),
+        #("qa_trans", QATransformer()),
+        #("dict_vect", DictVectorizer()),
+        #("selection", SelectKBest()),
         ("clf", MultinomialNB())
     ])
 
@@ -555,7 +576,7 @@ def qa_mnb_pipeline(data, targets, num_images=11):
                                             #{"qa_pipe": 0.75, "tfidf": 0.25}),
         # Chain pipeline methods with double underscores
         #"features__qa_pipe__qa_trans__end": (1, 2, 3),
-        "selection__k": (100, 500, "all")
+        #"selection__k": (100, 500, "all")
     }
 
     cv = KFold(len(targets), num_images)

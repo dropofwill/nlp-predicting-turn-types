@@ -4,3 +4,8 @@ PS3_test/
 
 *.csv
 .idea/*
+
+*.ai
+*.svg
+*.zip
+*.tar
