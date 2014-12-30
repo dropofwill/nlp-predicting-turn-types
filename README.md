@@ -1,4 +1,4 @@
-Predicting Turn Types for NLP Problem Set 3
+Predicting Turn Types
 ===============
 
 Team Members:
