@@ -1,10 +1,13 @@
 Predicting Turn Types for NLP Problem Set 3
 ===============
 
-Team Members
-Ryan Dennehy
-Tong Liu
-Will Paul
+Team Members:
+
+* Ryan Dennehy
+
+* Tong Liu
+
+* Will Paul
 
 ## TODO
 
@@ -18,7 +21,7 @@ Will Paul
 
 ## Feature ideas:
 
-*Ways to form questions in English:*
+#### Ways to form questions in English:
 
 Move the auxiliary verb to beginning of sentence, Subject-auxiliary inversion:
 
@@ -32,15 +35,13 @@ Adding a Wh-\* (WDT, WP, WP$, WRB, in treebank) to the beginning of a sentence, 
 
 she/PRP often/RB uses/NNS it/PRP  vs. how/WRB often/RB does/VBZ she/PRP use/NN it?/PRP
 
-Features:
-
 Wh-\* tag in within the first 3 tokens of the sentence
 
 [am, is, are, was, were, have, had, has, do, does, did] within the first 3 tokens of the sentence, but not after a NN\* tag
 
 [can, could, may, might, must, shall, should, will, would] within the first 3 tokens of the sentence, but not after a NN\* tag
 
-*Features that won't be image content specific:*
+### Features that won't be image content specific:
 
 √ Syntactic features
 
